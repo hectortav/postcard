@@ -23,7 +23,7 @@ describe('App', () => {
     const orig = globalThis.fetch;
     globalThis.fetch = vi.fn(async (u) => {
       fetches.push(String(u));
-      return new Response('[]', { headers: { 'X-Sendme-Mode': 'lan' } });
+      return new Response('[]', { headers: { 'X-Postcard-Mode': 'lan' } });
     }) as unknown as typeof fetch;
     render(<App />);
     await waitFor(() => expect(fetches).toContain('/api/files'));

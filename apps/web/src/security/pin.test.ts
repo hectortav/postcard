@@ -42,12 +42,12 @@ describe('pin', () => {
 
   it('encrypt returns a 12-byte IV and decrypt round-trips the plaintext', async () => {
     const key = await deriveKey(SECRET_HEX, PIN, SALT_HEX);
-    const pt = new TextEncoder().encode('hello, sendme');
+    const pt = new TextEncoder().encode('hello, postcard');
     const { iv, ciphertext } = await encrypt(key, pt);
     expect(iv.byteLength).toBe(12);
     expect(ciphertext.byteLength).toBeGreaterThan(0);
     const out = await decrypt(key, iv, ciphertext);
-    expect(new TextDecoder().decode(out)).toBe('hello, sendme');
+    expect(new TextDecoder().decode(out)).toBe('hello, postcard');
   });
 
   it('encrypt uses a fresh IV on every call', async () => {

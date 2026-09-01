@@ -12,7 +12,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // variant is what we see in this build; the `stylex.css` at root is the
 // fallback. We link whichever is present.
 const injectStylexCss = (): import('vite').Plugin => ({
-  name: 'sendme:inject-stylex-css',
+  name: 'postcard:inject-stylex-css',
   apply: 'build',
   enforce: 'post',
   transformIndexHtml: {

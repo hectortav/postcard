@@ -58,6 +58,9 @@ test-results/
 .DS_Store
 .AppleDouble
 .LSOverride
-Icon?
+Icon[\r]
 ehthumbs.db
 Desktop.ini
+
+# Icon rasterisation intermediates (regenerate from icons/*.svg)
+apps/cli-server/icons/png/

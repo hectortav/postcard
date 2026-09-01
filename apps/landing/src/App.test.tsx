@@ -35,13 +35,13 @@ describe('App', () => {
     const comparisonSection = document.querySelector('section[aria-labelledby="comparison-heading"]') as HTMLElement;
     expect(within(comparisonSection).getByText('How it compares')).toBeTruthy();
     // Terminal
-    expect(screen.getByText(/npx -y sendme/)).toBeTruthy();
+    expect(screen.getByText(/npx -y postcard/)).toBeTruthy();
     // Download (will settle into "Coming soon" given 404)
     await waitFor(() => expect(screen.getByText(/coming soon/i)).toBeTruthy());
     // Footer (anchored to the index-zr0 repo URL so it doesn't collide
     // with the "GitHub releases" link in the download section)
     const footerLink = screen.getAllByRole('link').find(
-      (a) => a.getAttribute('href') === 'https://github.com/index-zr0/sendme',
+      (a) => a.getAttribute('href') === 'https://github.com/index-zr0/postcard',
     );
     expect(footerLink).toBeTruthy();
     expect(footerLink?.textContent?.toLowerCase()).toBe('github');

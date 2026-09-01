@@ -1,2 +1,2 @@
-rootProject.name = "sendme-cli-server"
+rootProject.name = "postcard-cli-server"
 plugins { id("org.gradle.toolchains.foojay-resolver-convention") version "0.8.0" }

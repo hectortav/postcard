@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 // The cli-server is started with `--pin 1234` in the e2e-pin CI job
 // (see .github/workflows/build.yml `e2e-pin`). The bind URL is exported
-// to SENDME_E2E_URL and includes the fragment `&pin=1234`. The fragment
+// to POSTCARD_E2E_URL and includes the fragment `&pin=1234`. The fragment
 // is the client-side signal that gates the PinLockScreen on mount; the
 // actual unlock is POST /api/pin/verify, where the server re-derives
 // the AES key from (secret, pin, salt) and compares it to its stored
@@ -10,7 +10,7 @@ import { test, expect } from '@playwright/test';
 // navigate the browser to the absolute URL with the fragment
 // (Playwright strips the fragment when resolving a relative `goto('/')`
 // against baseURL).
-const E2E_URL = process.env.SENDME_E2E_URL ?? 'http://localhost:5173/';
+const E2E_URL = process.env.POSTCARD_E2E_URL ?? 'http://localhost:5173/';
 const PIN = '1234';
 
 test('correct PIN unlocks the dashboard and files round-trip', async ({ browser }) => {

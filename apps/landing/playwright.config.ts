@@ -9,13 +9,13 @@ export default defineConfig({
   workers: 1,
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
-    baseURL: process.env.SENDME_LANDING_E2E_URL ?? 'http://localhost:4173',
+    baseURL: process.env.POSTCARD_LANDING_E2E_URL ?? 'http://localhost:4173',
     trace: 'on-first-retry',
   },
   projects: [
     { name: 'chromium', use: { browserName: 'chromium' } },
   ],
-  webServer: process.env.SENDME_LANDING_E2E_URL
+  webServer: process.env.POSTCARD_LANDING_E2E_URL
     ? undefined
     : {
         command: 'pnpm preview --port 4173',

@@ -1,11 +1,11 @@
 import stylex from '@stylexjs/stylex';
 
-const GITHUB_URL = 'https://github.com/index-zr0/sendme';
+const GITHUB_URL = 'https://github.com/index-zr0/postcard';
 
 export function Footer() {
   return (
     <footer className={stylex(styles.footer)}>
-      <span className={stylex(styles.text)}>sendme</span>
+      <span className={stylex(styles.text)}>postcard</span>
       <span className={stylex(styles.dot)} aria-hidden="true">·</span>
       <span className={stylex(styles.text)}>by air</span>
       <span className={stylex(styles.dot)} aria-hidden="true">·</span>

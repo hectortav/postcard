@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect x="0" y="0" width="512" height="512" rx="115" fill="#F4EEE2"/>
+  <g stroke="#1A1714" stroke-width="13" stroke-linecap="round" fill="none" opacity="0.9">
+    <path d="M -20 176 Q 60 154 140 176 T 300 176 T 460 176 T 620 176"/>
+    <path d="M -20 224 Q 60 202 140 224 T 300 224 T 460 224 T 620 224"/>
+    <path d="M -20 288 Q 60 266 140 288 T 300 288 T 460 288 T 620 288"/>
+    <path d="M -20 336 Q 60 314 140 336 T 300 336 T 460 336 T 620 336"/>
+  </g>
+  <circle cx="256" cy="256" r="156" fill="#F4EEE2"/>
+  <circle cx="256" cy="256" r="158" fill="none" stroke="#A8332A" stroke-width="15"/>
+  <circle cx="256" cy="256" r="104" fill="none" stroke="#A8332A" stroke-width="6"/>
+  <defs>
+    <path id="topArc" d="M 136 256 A 120 120 0 0 1 376 256" fill="none"/>
+    <path id="botArc" d="M 128 256 A 128 128 0 0 0 384 256" fill="none"/>
+  </defs>
+  <text font-family="Iowan Old Style, Palatino, Georgia, serif" font-size="34"
+        letter-spacing="4" fill="#A8332A">
+    <textPath href="#topArc" startOffset="50%" text-anchor="middle">POSTCARD</textPath>
+  </text>
+  <text font-family="Iowan Old Style, Palatino, Georgia, serif" font-size="23"
+        letter-spacing="5" fill="#A8332A">
+    <textPath href="#botArc" startOffset="50%" text-anchor="middle">NO CLOUD</textPath>
+  </text>
+  <rect x="206" y="249" width="100" height="13" rx="6.5" fill="#A8332A"/>
+</svg>

@@ -11,30 +11,30 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // build, but does NOT inject a corresponding <link> in production
 // (`transformIndexHtml` is gated to `devMode === 'full'`). We do it
 // here, with a path that respects Vite's `base` (so GitHub Pages
-// hosting at `/sendme/` resolves the asset correctly).
+// hosting at `/postcard/` resolves the asset correctly).
 const injectStylexCss = (): import('vite').Plugin => ({
-  name: 'sendme:inject-stylex-css',
+  name: 'postcard:inject-stylex-css',
   apply: 'build',
   enforce: 'post',
   transformIndexHtml: {
     order: 'post',
     handler(html) {
       // We hardcode the prefix here because the `base` config is
-      // `/sendme/` (see the top of this file); if the base ever
+      // `/postcard/` (see the top of this file); if the base ever
       // changes, update this string in lockstep.
-      const link = '<link rel="stylesheet" href="/sendme/assets/stylex.css">';
-      if (html.includes('href="/sendme/assets/stylex.css"') || html.includes('href="/sendme/stylex.css"')) return html;
+      const link = '<link rel="stylesheet" href="/postcard/assets/stylex.css">';
+      if (html.includes('href="/postcard/assets/stylex.css"') || html.includes('href="/postcard/stylex.css"')) return html;
       return html.replace('</head>', `  ${link}\n  </head>`);
     },
   },
 });
 
 export default defineConfig({
-  // `base: "/sendme/"` is the GitHub Pages URL prefix. The repo name on
-  // GitHub Pages is `sendme` (https://index-zr0.github.io/sendme/), so
-  // every asset URL needs to be prefixed with `/sendme/` to resolve.
+  // `base: "/postcard/"` is the GitHub Pages URL prefix. The repo name on
+  // GitHub Pages is `postcard` (https://index-zr0.github.io/postcard/), so
+  // every asset URL needs to be prefixed with `/postcard/` to resolve.
   // If the repo is ever renamed, this string must change in lockstep.
-  base: '/sendme/',
+  base: '/postcard/',
   plugins: [
     preact(),
     stylexPlugin.vite({ unstable_moduleResolution: { type: 'commonJS', rootDir: __dirname } }),

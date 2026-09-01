@@ -26,7 +26,7 @@ test('landing page renders all sections and airmail stripe', async ({ page }) =>
   await expect(page.getByText('Cross-platform')).toBeVisible();
 
   // Terminal block.
-  await expect(page.getByText(/npx -y sendme/)).toBeVisible();
+  await expect(page.getByText(/npx -y postcard/)).toBeVisible();
 
   // Download section: either three buttons (release exists) or
   // "Coming soon" + a GitHub releases link (no release).
@@ -35,6 +35,6 @@ test('landing page renders all sections and airmail stripe', async ({ page }) =>
   await expect(macButton.or(comingSoon)).toBeVisible();
 
   // Footer github link.
-  const gh = page.locator('a[href="https://github.com/index-zr0/sendme"]');
+  const gh = page.locator('a[href="https://github.com/index-zr0/postcard"]');
   await expect(gh).toBeVisible();
 });

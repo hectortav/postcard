@@ -1,5 +1,5 @@
 {
-  "name": "@sendme/landing",
+  "name": "@postcard/landing",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -19,8 +19,8 @@
     "@stylexjs/stylex": "^0.7.5"
   },
   "devDependencies": {
-    "@sendme/config-typescript": "workspace:*",
-    "@sendme/config-eslint": "workspace:*",
+    "@postcard/config-typescript": "workspace:*",
+    "@postcard/config-eslint": "workspace:*",
     "@preact/preset-vite": "^2.9.0",
     "@stylexjs/unplugin": "^0.17.0",
     "vite": "^5.4.1",

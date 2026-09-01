@@ -83,15 +83,15 @@ jobs:
       - run: pnpm turbo run build
       - name: JaCoCo coverage gate (cli-server)
         run: cd apps/cli-server && ./gradlew test jacocoTestReport jacocoTestCoverageVerification
-      - name: Vitest coverage gate (@sendme/web)
-        run: pnpm --filter @sendme/web test:coverage
-      - name: Vitest coverage gate (@sendme/landing)
-        run: pnpm --filter @sendme/landing test:coverage
+      - name: Vitest coverage gate (@postcard/web)
+        run: pnpm --filter @postcard/web test:coverage
+      - name: Vitest coverage gate (@postcard/landing)
+        run: pnpm --filter @postcard/landing test:coverage
       - name: Upload coverage HTML reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: sendme-coverage-html
+          name: postcard-coverage-html
           path: |
             apps/cli-server/build/reports/jacoco/test/html
             apps/web/coverage
@@ -125,33 +125,33 @@ jobs:
       - name: Boot server and capture BIND line
         run: |
           cd apps/cli-server
-          stdbuf -oL -eL ./gradlew run --args="--port auto --path /tmp/sendme-e2e --no-browser" > /tmp/sendme.out 2>&1 &
+          stdbuf -oL -eL ./gradlew run --args="--port auto --path /tmp/postcard-e2e --no-browser" > /tmp/postcard.out 2>&1 &
           SERVER_PID=$!
           for i in {1..240}; do
-            if grep -q '^BIND ' /tmp/sendme.out 2>/dev/null; then break; fi
+            if grep -q '^BIND ' /tmp/postcard.out 2>/dev/null; then break; fi
             sleep 1
           done
-          URL=$(grep -E '^BIND ' /tmp/sendme.out | head -1 | sed -E 's/^BIND //')
+          URL=$(grep -E '^BIND ' /tmp/postcard.out | head -1 | sed -E 's/^BIND //')
           if [ -z "$URL" ]; then
             echo "::error::Server did not print a BIND line within 240s"
-            cat /tmp/sendme.out
+            cat /tmp/postcard.out
             kill $SERVER_PID || true
             exit 1
           fi
           echo "Server BIND: $URL"
-          echo "SENDME_E2E_URL=$URL" >> $GITHUB_ENV
-      - run: pnpm --filter @sendme/web exec playwright install --with-deps chromium webkit
+          echo "POSTCARD_E2E_URL=$URL" >> $GITHUB_ENV
+      - run: pnpm --filter @postcard/web exec playwright install --with-deps chromium webkit
       # Only run the baseline specs here: clipboard, host-and-mobile,
       # range-download. The pin-* and encrypted specs need a server
       # started with --pin / --encrypt and live in their own dedicated
       # jobs (e2e-pin, e2e-pin-rate-limit, e2e-encrypted).
-      - run: pnpm --filter @sendme/web e2e --grep "clipboard|host-and-mobile|range-download"
+      - run: pnpm --filter @postcard/web e2e --grep "clipboard|host-and-mobile|range-download"
       - name: Teardown
         if: always()
         run: |
           pkill -f 'gradle' 2>/dev/null || true
           pkill -f 'GradleDaemon' 2>/dev/null || true
-          pkill -f 'sendme-cli-server' 2>/dev/null || true
+          pkill -f 'postcard-cli-server' 2>/dev/null || true
 
   e2e-encrypted:
     runs-on: ${{ matrix.os }}
@@ -182,20 +182,20 @@ jobs:
       - name: Boot server with --encrypt and capture BIND line
         run: |
           cd apps/cli-server
-          stdbuf -oL -eL ./gradlew run --args="--port auto --path /tmp/sendme-e2e-enc --no-browser --encrypt" > /tmp/sendme.out 2>&1 &
+          stdbuf -oL -eL ./gradlew run --args="--port auto --path /tmp/postcard-e2e-enc --no-browser --encrypt" > /tmp/postcard.out 2>&1 &
           for i in {1..60}; do
-            if grep -q '^BIND ' /tmp/sendme.out 2>/dev/null; then break; fi
+            if grep -q '^BIND ' /tmp/postcard.out 2>/dev/null; then break; fi
             sleep 1
           done
-          URL=$(grep -E '^BIND ' /tmp/sendme.out | head -1 | sed -E 's/^BIND //')
+          URL=$(grep -E '^BIND ' /tmp/postcard.out | head -1 | sed -E 's/^BIND //')
           if [ -z "$URL" ]; then
             echo "::error::Encrypted server did not print a BIND line"
-            cat /tmp/sendme.out
+            cat /tmp/postcard.out
             exit 1
           fi
-          echo "SENDME_E2E_URL=$URL" >> $GITHUB_ENV
-      - run: pnpm --filter @sendme/web exec playwright install --with-deps chromium webkit
-      - run: pnpm --filter @sendme/web e2e --grep encrypted
+          echo "POSTCARD_E2E_URL=$URL" >> $GITHUB_ENV
+      - run: pnpm --filter @postcard/web exec playwright install --with-deps chromium webkit
+      - run: pnpm --filter @postcard/web e2e --grep encrypted
       - if: always()
         run: pkill -f 'gradle' 2>/dev/null || true
 
@@ -203,7 +203,7 @@ jobs:
     # Runs the correct-PIN flow spec against a server started with --pin.
     # The cli-server prints the URL fragment `&pin=1234` which the
     # PinLockScreen reads on mount to gate the dashboard. The BIND URL
-    # (with fragment) is exported to SENDME_E2E_URL; the spec navigates
+    # (with fragment) is exported to POSTCARD_E2E_URL; the spec navigates
     # to that absolute URL so the browser sees the fragment.
     #
     # This job runs only the correct-flow spec on purpose: the rate-limit
@@ -237,20 +237,20 @@ jobs:
       - name: Boot server with --pin 1234 and capture BIND line
         run: |
           cd apps/cli-server
-          stdbuf -oL -eL ./gradlew run --args="--port auto --path /tmp/sendme-e2e-pin --no-browser --pin 1234" > /tmp/sendme.out 2>&1 &
+          stdbuf -oL -eL ./gradlew run --args="--port auto --path /tmp/postcard-e2e-pin --no-browser --pin 1234" > /tmp/postcard.out 2>&1 &
           for i in {1..240}; do
-            if grep -q '^BIND ' /tmp/sendme.out 2>/dev/null; then break; fi
+            if grep -q '^BIND ' /tmp/postcard.out 2>/dev/null; then break; fi
             sleep 1
           done
-          URL=$(grep -E '^BIND ' /tmp/sendme.out | head -1 | sed -E 's/^BIND //')
+          URL=$(grep -E '^BIND ' /tmp/postcard.out | head -1 | sed -E 's/^BIND //')
           if [ -z "$URL" ]; then
             echo "::error::Pin server did not print a BIND line within 240s"
-            cat /tmp/sendme.out
+            cat /tmp/postcard.out
             exit 1
           fi
-          echo "SENDME_E2E_URL=$URL" >> $GITHUB_ENV
-      - run: pnpm --filter @sendme/web exec playwright install --with-deps chromium webkit
-      - run: pnpm --filter @sendme/web e2e --grep "pin-correct-flow"
+          echo "POSTCARD_E2E_URL=$URL" >> $GITHUB_ENV
+      - run: pnpm --filter @postcard/web exec playwright install --with-deps chromium webkit
+      - run: pnpm --filter @postcard/web e2e --grep "pin-correct-flow"
       - if: always()
         run: pkill -f 'gradle' 2>/dev/null || true
 
@@ -287,20 +287,20 @@ jobs:
       - name: Boot server with --pin 1234 and capture BIND line
         run: |
           cd apps/cli-server
-          stdbuf -oL -eL ./gradlew run --args="--port auto --path /tmp/sendme-e2e-pin-rl --no-browser --pin 1234" > /tmp/sendme.out 2>&1 &
+          stdbuf -oL -eL ./gradlew run --args="--port auto --path /tmp/postcard-e2e-pin-rl --no-browser --pin 1234" > /tmp/postcard.out 2>&1 &
           for i in {1..240}; do
-            if grep -q '^BIND ' /tmp/sendme.out 2>/dev/null; then break; fi
+            if grep -q '^BIND ' /tmp/postcard.out 2>/dev/null; then break; fi
             sleep 1
           done
-          URL=$(grep -E '^BIND ' /tmp/sendme.out | head -1 | sed -E 's/^BIND //')
+          URL=$(grep -E '^BIND ' /tmp/postcard.out | head -1 | sed -E 's/^BIND //')
           if [ -z "$URL" ]; then
             echo "::error::Pin-rate-limit server did not print a BIND line within 240s"
-            cat /tmp/sendme.out
+            cat /tmp/postcard.out
             exit 1
           fi
-          echo "SENDME_E2E_URL=$URL" >> $GITHUB_ENV
-      - run: pnpm --filter @sendme/web exec playwright install --with-deps chromium
-      - run: pnpm --filter @sendme/web e2e --grep "pin-rate-limit" --project=chromium
+          echo "POSTCARD_E2E_URL=$URL" >> $GITHUB_ENV
+      - run: pnpm --filter @postcard/web exec playwright install --with-deps chromium
+      - run: pnpm --filter @postcard/web e2e --grep "pin-rate-limit" --project=chromium
       - if: always()
         run: pkill -f 'gradle' 2>/dev/null || true
 
@@ -328,7 +328,7 @@ jobs:
       - run: cd apps/cli-server && ./gradlew shadowJar
       - uses: actions/upload-artifact@v4
         with:
-          name: sendme-${{ matrix.os }}
+          name: postcard-${{ matrix.os }}
           path: apps/cli-server/build/libs/*-all.jar
 
   agent-run:
@@ -407,5 +407,5 @@ jobs:
       - run: cd apps/cli-server && ./gradlew nativeCompile
       - uses: actions/upload-artifact@v4
         with:
-          name: sendme-native-${{ matrix.os }}
-          path: apps/cli-server/build/native/nativeCompile/sendme
+          name: postcard-native-${{ matrix.os }}
+          path: apps/cli-server/build/native/nativeCompile/postcard

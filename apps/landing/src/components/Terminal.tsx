@@ -13,9 +13,9 @@ export function Terminal() {
       <pre className={stylex(styles.block)} aria-label="Terminal session">
         <code>
           <span className={stylex(styles.prompt)}>$</span>
-          {' '}<span className={stylex(styles.cmd)}>npx -y sendme ~/Desktop/photo.jpg</span>
+          {' '}<span className={stylex(styles.cmd)}>npx -y postcard ~/Desktop/photo.jpg</span>
           {'\n'}
-          <span className={stylex(styles.out)}>sendme 0.1.0 — listening on http://192.168.1.10:8080/</span>
+          <span className={stylex(styles.out)}>postcard 0.1.0 — listening on http://192.168.1.10:8080/</span>
           {'\n'}
           <span className={stylex(styles.out)}>scan the qr to open on another device ▣</span>
         </code>

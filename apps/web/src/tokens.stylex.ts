@@ -1,5 +1,5 @@
 /**
- * Design tokens for the sendme web UI — the "Civvies" direction.
+ * Design tokens for the postcard web UI — the "Civvies" direction.
  *
  * Subject: a one-shot way to move a file from one device to another on the
  * same WiFi. The page is a postcard, not a dashboard: paper, ink, a

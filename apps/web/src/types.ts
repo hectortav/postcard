@@ -12,4 +12,4 @@ export type ServerEvent =
   | { type: 'file_removed'; id: string }
   | { type: 'clipboard'; text: string };
 
-export type SendmeMode = 'lan' | 'hotspot';
+export type PostcardMode = 'lan' | 'hotspot';

@@ -5,7 +5,7 @@ type Cell = string;
 
 type Row = {
   label: string;
-  values: readonly [Cell, Cell, Cell, Cell]; // sendme, AirDrop, Snapdrop/PairDrop, LocalSend
+  values: readonly [Cell, Cell, Cell, Cell]; // postcard, AirDrop, Snapdrop/PairDrop, LocalSend
 };
 
 type Column = {
@@ -14,7 +14,7 @@ type Column = {
 };
 
 const COLUMNS: readonly Column[] = [
-  { name: 'sendme', emphasis: true },
+  { name: 'postcard', emphasis: true },
   { name: 'AirDrop', emphasis: false },
   { name: 'Snapdrop / PairDrop', emphasis: false },
   { name: 'LocalSend', emphasis: false },
@@ -73,7 +73,7 @@ export function ComparisonTable() {
         How it compares
       </h2>
       {layout === 'grid' ? (
-        <div className={stylex(styles.grid)} role="table" aria-label="sendme vs competitors">
+        <div className={stylex(styles.grid)} role="table" aria-label="postcard vs competitors">
           <div className={stylex(styles.headerRow)} role="row">
             <div
               className={stylex(styles.headerCell, styles.headerCorner)}

@@ -22,11 +22,11 @@ function getSection(): HTMLElement {
 
 describe('ComparisonTable', () => {
   describe('column + row coverage', () => {
-    it('renders all four column headers: sendme, AirDrop, Snapdrop / PairDrop, LocalSend', () => {
+    it('renders all four column headers: postcard, AirDrop, Snapdrop / PairDrop, LocalSend', () => {
       setViewport(1280);
       render(<ComparisonTable />);
       const section = getSection();
-      expect(within(section).getByText('sendme')).toBeTruthy();
+      expect(within(section).getByText('postcard')).toBeTruthy();
       expect(within(section).getByText('AirDrop')).toBeTruthy();
       expect(within(section).getByText('Snapdrop / PairDrop')).toBeTruthy();
       expect(within(section).getByText('LocalSend')).toBeTruthy();
@@ -44,14 +44,14 @@ describe('ComparisonTable', () => {
     });
   });
 
-  describe('sendme column content (spec-exact)', () => {
-    it('renders the "Zero Mobile App Install" sendme value', () => {
+  describe('postcard column content (spec-exact)', () => {
+    it('renders the "Zero Mobile App Install" postcard value', () => {
       setViewport(1280);
       render(<ComparisonTable />);
       expect(screen.getAllByText(/^✅ Yes$/).length).toBeGreaterThan(0);
     });
 
-    it('renders the "100% Offline (No Internet)" sendme value', () => {
+    it('renders the "100% Offline (No Internet)" postcard value', () => {
       setViewport(1280);
       render(<ComparisonTable />);
       const section = getSection();
@@ -60,7 +60,7 @@ describe('ComparisonTable', () => {
       expect(offlineRow.textContent).toMatch(/✅ Yes/);
     });
 
-    it('renders the "Executable Footprint" sendme value "< 30 MB (Native)"', () => {
+    it('renders the "Executable Footprint" postcard value "< 30 MB (Native)"', () => {
       setViewport(1280);
       render(<ComparisonTable />);
       const section = getSection();
@@ -69,7 +69,7 @@ describe('ComparisonTable', () => {
       expect(row.textContent).toMatch(/< 30 MB \(Native\)/);
     });
 
-    it('renders the "Security Layer" sendme value "AES-256-GCM + PIN"', () => {
+    it('renders the "Security Layer" postcard value "AES-256-GCM + PIN"', () => {
       setViewport(1280);
       render(<ComparisonTable />);
       const section = getSection();
@@ -78,7 +78,7 @@ describe('ComparisonTable', () => {
       expect(row.textContent).toMatch(/AES-256-GCM \+ PIN/);
     });
 
-    it('renders the "Platform Compatibility" sendme value with iOS + Android', () => {
+    it('renders the "Platform Compatibility" postcard value with iOS + Android', () => {
       setViewport(1280);
       render(<ComparisonTable />);
       const section = getSection();
@@ -107,8 +107,8 @@ describe('ComparisonTable', () => {
     });
   });
 
-  describe('sendme column emphasis', () => {
-    it('renders the "← you are here" annotation above the sendme header', () => {
+  describe('postcard column emphasis', () => {
+    it('renders the "← you are here" annotation above the postcard header', () => {
       setViewport(1280);
       render(<ComparisonTable />);
       const section = getSection();
@@ -116,14 +116,14 @@ describe('ComparisonTable', () => {
       expect(annotation).toBeTruthy();
     });
 
-    it('applies an airmail-brick top border to the sendme column header', () => {
+    it('applies an airmail-brick top border to the postcard column header', () => {
       setViewport(1280);
       render(<ComparisonTable />);
       const section = getSection();
-      const sendmeHeader = within(section)
-        .getByText('sendme')
+      const postcardHeader = within(section)
+        .getByText('postcard')
         .closest('[role="columnheader"]') as HTMLElement;
-      const cs = getComputedStyle(sendmeHeader);
+      const cs = getComputedStyle(postcardHeader);
       // happy-dom normalises inline hex to itself; real browsers would
       // resolve to rgb(168, 51, 42). Accept either.
       const normalised = cs.borderTopColor.toLowerCase();
@@ -134,16 +134,16 @@ describe('ComparisonTable', () => {
       expect(cs.borderTopStyle).toBe('solid');
     });
 
-    it('the sendme column data cells also carry the brick top border', () => {
+    it('the postcard column data cells also carry the brick top border', () => {
       setViewport(1280);
       render(<ComparisonTable />);
       const section = getSection();
       const cells = section.querySelectorAll('[role="cell"]');
-      // First column is sendme; every sendme cell in the data rows carries the border.
-      const sendmeCells = Array.from(cells).filter((c) =>
+      // First column is postcard; every postcard cell in the data rows carries the border.
+      const postcardCells = Array.from(cells).filter((c) =>
         c.getAttribute('style')?.includes('border-top'),
       );
-      expect(sendmeCells.length).toBe(5);
+      expect(postcardCells.length).toBe(5);
     });
   });
 

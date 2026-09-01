@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect x="0" y="0" width="512" height="512" rx="115" fill="#F4EEE2"/>
+  <rect x="10" y="10" width="492" height="492" rx="107" fill="none" stroke="#D8CDB7" stroke-width="8"/>
+  <rect x="250" y="104" width="12" height="304" rx="6" fill="#1A1714"/>
+  <rect x="316" y="104" width="112" height="94" rx="4" fill="none" stroke="#A8332A"
+        stroke-width="10" stroke-dasharray="17 12"/>
+  <text x="372" y="180" text-anchor="middle" font-family="Iowan Old Style, Palatino, Georgia, serif"
+        font-size="76" fill="#A8332A">p</text>
+  <g fill="#8C8474">
+    <rect x="316" y="248" width="112" height="13" rx="6.5"/>
+    <rect x="316" y="298" width="146" height="13" rx="6.5"/>
+    <rect x="316" y="348" width="128" height="13" rx="6.5"/>
+  </g>
+  <g fill="#8C8474" opacity="0.75">
+    <rect x="84" y="148" width="132" height="12" rx="6"/>
+    <rect x="84" y="200" width="104" height="12" rx="6"/>
+    <rect x="84" y="252" width="140" height="12" rx="6"/>
+    <rect x="84" y="304" width="88"  height="12" rx="6"/>
+    <rect x="84" y="356" width="120" height="12" rx="6"/>
+  </g>
+</svg>

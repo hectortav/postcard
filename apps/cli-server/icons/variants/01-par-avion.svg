@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <pattern id="airmail" width="56" height="56" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="56" height="56" fill="#F4EEE2"/>
+      <rect x="0"  width="19" height="56" fill="#A8332A"/>
+      <rect x="28" width="19" height="56" fill="#1A1714"/>
+    </pattern>
+    <mask id="ring">
+      <rect x="0" y="0" width="512" height="512" rx="115" fill="#fff"/>
+      <rect x="46" y="46" width="420" height="420" rx="74" fill="#000"/>
+    </mask>
+  </defs>
+  <rect x="0" y="0" width="512" height="512" rx="115" fill="#F4EEE2"/>
+  <rect x="0" y="0" width="512" height="512" fill="url(#airmail)" mask="url(#ring)"/>
+  <text x="256" y="330" text-anchor="middle" font-family="Iowan Old Style, Palatino, Georgia, serif"
+        font-size="240" fill="#1A1714">p</text>
+</svg>

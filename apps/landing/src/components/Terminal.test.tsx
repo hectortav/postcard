@@ -6,7 +6,7 @@ describe('Terminal', () => {
   it('renders the canonical npx command', () => {
     const { container } = render(<Terminal />);
     const pre = container.querySelector('pre');
-    expect(pre?.textContent).toContain('npx -y sendme');
+    expect(pre?.textContent).toContain('npx -y postcard');
     expect(pre?.textContent).toContain('~/Desktop/photo.jpg');
   });
 

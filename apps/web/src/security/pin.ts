@@ -1,7 +1,7 @@
 /**
  * Browser-side WebCrypto wrapper for the PIN layer.
  *
- * Mirrors {@code io.sendme.security.PinSecurityEngine} on the Java side:
+ * Mirrors {@code io.postcard.security.PinSecurityEngine} on the Java side:
  * both ends derive the same 256-bit AES key from
  * {@code PBKDF2-HMAC-SHA256(secretBytes, pin, salt)} with 200,000
  * iterations. The salt is {@code SHA-256(secretBytes)} (hex) so both

@@ -7,7 +7,7 @@ import { FileList } from './components/FileList';
 import { Clipboard } from './components/Clipboard';
 import { QRCode } from './components/QRCode';
 import { PinLockScreen, type VerifyResult } from './components/PinLockScreen';
-import type { FileEntry, SendmeMode } from './types';
+import type { FileEntry, PostcardMode } from './types';
 
 const WS_URL = (): string => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
 
@@ -58,7 +58,7 @@ export function App() {
   const [tab, setTab] = useState<Tab>('files');
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [clipboard, setClipboard] = useState<string>('');
-  const [mode, setMode] = useState<SendmeMode>('lan');
+  const [mode, setMode] = useState<PostcardMode>('lan');
   const [hotspot, setHotspot] = useState<{ ssid: string; password: string } | null>(null);
   const pinLength = useMemo<number | null>(() => readPinLengthFromHash(), []);
   const [pinUnlocked, setPinUnlocked] = useState<boolean>(() => readPinLengthFromHash() === null);
@@ -74,7 +74,7 @@ export function App() {
     const ac = new AbortController();
     fetch('/api/files', { cache: 'no-store', signal: ac.signal })
       .then(async (r) => {
-        const m = r.headers.get('X-Sendme-Mode');
+        const m = r.headers.get('X-Postcard-Mode');
         if (m === 'hotspot' || m === 'lan') setMode(m);
         if (r.ok) setFiles(await r.json());
       })
@@ -111,7 +111,7 @@ export function App() {
         <>
           <header className={stylex(styles.header)}>
             <div className={stylex(styles.stripe)} aria-hidden="true" />
-            <h1 className={stylex(styles.title)}>sendme.</h1>
+            <h1 className={stylex(styles.title)}>postcard.</h1>
             <p className={stylex(styles.subtitle)}>a one-shot way to move a file between two devices on the same wifi</p>
           </header>
           <nav className={stylex(styles.tabs)} role="tablist">

@@ -11,7 +11,7 @@ const OS_LABEL: Record<OsId, string> = {
   linux: 'Linux',
 };
 
-const RELEASES_PAGE = 'https://github.com/index-zr0/sendme/releases';
+const RELEASES_PAGE = 'https://github.com/index-zr0/postcard/releases';
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;

@@ -16,10 +16,10 @@ export function Clipboard({ value, onChange }: { value: string; onChange: (t: st
 
   return (
     <div className={stylex(styles.wrap)}>
-      <label className={stylex(styles.label)} htmlFor="sendme-clipboard">Shared clipboard</label>
+      <label className={stylex(styles.label)} htmlFor="postcard-clipboard">Shared clipboard</label>
       <p className={stylex(styles.help)}>Anything you type here shows up on the other devices.</p>
       <textarea
-        id="sendme-clipboard"
+        id="postcard-clipboard"
         ref={ref}
         className={stylex(styles.area)}
         onInput={onInput}

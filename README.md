@@ -1,4 +1,4 @@
-# sendme
+# postcard
 
 Local file-sharing CLI + web UI. Drop files in the browser, share the printed URL,
 let other devices on the LAN (or your hotspot) download — all in-process, no cloud,
@@ -16,10 +16,10 @@ pnpm turbo run build
 cd apps/cli-server && ./gradlew shadowJar
 
 # run it
-java -jar build/libs/sendme-cli-server-0.1.0-all.jar
+java -jar build/libs/postcard-cli-server-0.1.0-all.jar
 
 # or with encryption
-java -jar build/libs/sendme-cli-server-0.1.0-all.jar --encrypt
+java -jar build/libs/postcard-cli-server-0.1.0-all.jar --encrypt
 ```
 
 The server prints a URL and a QR code. Point a phone at the QR, drop files in
@@ -39,8 +39,8 @@ the page, copy the link.
 | `--max-upload <MiB>` | unbounded | pre-disk enforcement |
 | `--auth-token` | none | optional WS handshake secret |
 
-See [`docs/superpowers/specs/2026-09-03-sendme-design.md`](docs/superpowers/specs/2026-09-03-sendme-design.md)
-for the design spec and [`docs/superpowers/plans/2026-09-03-sendme-impl.md`](docs/superpowers/plans/2026-09-03-sendme-impl.md)
+See [`docs/superpowers/specs/2026-09-03-postcard-design.md`](docs/superpowers/specs/2026-09-03-postcard-design.md)
+for the design spec and [`docs/superpowers/plans/2026-09-03-postcard-impl.md`](docs/superpowers/plans/2026-09-03-postcard-impl.md)
 for the implementation plan.
 
 ## Building installers
@@ -54,13 +54,13 @@ cd apps/cli-server
 
 # Self-contained app image (works on any host).
 ./gradlew appImage
-# -> build/dist/sendme.app/  (macOS)   build/dist/sendme/  (Linux / Windows)
+# -> build/dist/postcard.app/  (macOS)   build/dist/postcard/  (Linux / Windows)
 
 # Platform installers. Each is `enabled = false` on the wrong OS, so calling
 # jpackageMsi on a Mac just prints `Task :jpackageMsi SKIPPED` and exits 0.
-./gradlew jpackageDmg   # macOS  -> build/dist/installer/sendme-<appVersion>.dmg
-./gradlew jpackageMsi   # Win    -> build/dist/installer/sendme-<appVersion>.msi
-./gradlew jpackageDeb   # Linux  -> build/dist/installer/sendme_<appVersion>_amd64.deb
+./gradlew jpackageDmg   # macOS  -> build/dist/installer/postcard-<appVersion>.dmg
+./gradlew jpackageMsi   # Win    -> build/dist/installer/postcard-<appVersion>.msi
+./gradlew jpackageDeb   # Linux  -> build/dist/installer/postcard_<appVersion>_amd64.deb
 ```
 
 `<appVersion>` is `version` from `build.gradle.kts`, except when it starts with
@@ -78,7 +78,7 @@ Notes:
 
 [`.github/workflows/release.yml`](.github/workflows/release.yml) builds the
 platform installers on every `v*.*.*` tag push and uploads them as
-`sendme-installer-{ubuntu,macos,windows}` artifacts. The GitHub Pages
+`postcard-installer-{ubuntu,macos,windows}` artifacts. The GitHub Pages
 deploy step is scaffolded (commented out) at the bottom of the file —
 uncomment it when the first hand-cut tag is ready and the landing page
 should go live alongside the installers.
@@ -91,10 +91,10 @@ should go live alongside the installers.
   knowing the URL alone is insufficient to decrypt the file stream.
 - **Rate limit**: per-IP, 3 wrong PINs → 15-minute lockout (returns 429 with
   `lockoutMsRemaining` so the UI can show a countdown).
-- **Coverage gate**: new `io.sendme.security.*` code is held to 100% line +
+- **Coverage gate**: new `io.postcard.security.*` code is held to 100% line +
   branch coverage by the `coverage` CI job; the rest of the repo is held
   to 90% (JaCoCo + Vitest thresholds).
 
-See [`docs/superpowers/plans/2026-09-03-sendme-pin-coverage.md`](docs/superpowers/plans/2026-09-03-sendme-pin-coverage.md)
-for the PIN-security design and [`apps/cli-server/src/main/java/io/sendme/security/`](apps/cli-server/src/main/java/io/sendme/security/)
+See [`docs/superpowers/plans/2026-09-03-postcard-pin-coverage.md`](docs/superpowers/plans/2026-09-03-postcard-pin-coverage.md)
+for the PIN-security design and [`apps/cli-server/src/main/java/io/postcard/security/`](apps/cli-server/src/main/java/io/postcard/security/)
 for the implementation.

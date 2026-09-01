@@ -4,7 +4,7 @@ import { QRCode } from './QRCode';
 
 describe('QRCode', () => {
   it('renders a hotspot-mode QR for the given SSID/password', async () => {
-    const { container } = render(<QRCode mode="hotspot" ssid="sendme-XYZ" password="abc12345" />);
+    const { container } = render(<QRCode mode="hotspot" ssid="postcard-XYZ" password="abc12345" />);
     await waitFor(() => expect(container.querySelector('svg')).toBeTruthy());
   });
   it('renders the connection URL as a QR in lan mode', async () => {

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect x="0" y="0" width="512" height="512" rx="115" fill="#F4EEE2"/>
+  <g transform="rotate(-4 256 256)">
+    <rect x="112" y="96" width="288" height="320" fill="#A8332A"/>
+    <g fill="#F4EEE2">
+      <circle cx="112" cy="96"  r="13"/><circle cx="160" cy="96"  r="13"/><circle cx="208" cy="96"  r="13"/>
+      <circle cx="256" cy="96"  r="13"/><circle cx="304" cy="96"  r="13"/><circle cx="352" cy="96"  r="13"/>
+      <circle cx="400" cy="96"  r="13"/>
+      <circle cx="112" cy="416" r="13"/><circle cx="160" cy="416" r="13"/><circle cx="208" cy="416" r="13"/>
+      <circle cx="256" cy="416" r="13"/><circle cx="304" cy="416" r="13"/><circle cx="352" cy="416" r="13"/>
+      <circle cx="400" cy="416" r="13"/>
+      <circle cx="112" cy="160" r="13"/><circle cx="112" cy="224" r="13"/>
+      <circle cx="112" cy="288" r="13"/><circle cx="112" cy="352" r="13"/>
+      <circle cx="400" cy="160" r="13"/><circle cx="400" cy="224" r="13"/>
+      <circle cx="400" cy="288" r="13"/><circle cx="400" cy="352" r="13"/>
+    </g>
+    <rect x="146" y="130" width="220" height="252" fill="none" stroke="#F4EEE2" stroke-width="5"/>
+    <text x="256" y="326" text-anchor="middle" font-family="Iowan Old Style, Palatino, Georgia, serif"
+          font-size="210" fill="#F4EEE2">p</text>
+  </g>
+</svg>

@@ -1,5 +1,5 @@
 {
-  "extends": "@sendme/config-typescript/lib.json",
+  "extends": "@postcard/config-typescript/lib.json",
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {

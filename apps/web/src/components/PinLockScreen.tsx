@@ -6,7 +6,7 @@ import stylex from '@stylexjs/stylex';
 // primitives (no function/object values), so we inject a tiny <style>
 // element scoped to this module. happy-dom supports inline <style> blocks
 // for the tests; the Vite build inlines it into the production HTML.
-const SHAKE_CSS = `@keyframes sendme-pin-shake {
+const SHAKE_CSS = `@keyframes postcard-pin-shake {
   0%   { transform: translateX(0); }
   20%  { transform: translateX(-6px); }
   40%  { transform: translateX(6px); }
@@ -226,7 +226,7 @@ const styles = stylex.create({
     boxSizing: 'border-box',
   },
   cardShake: {
-    animationName: 'sendme-pin-shake',
+    animationName: 'postcard-pin-shake',
     animationDuration: '300ms',
     animationTimingFunction: 'ease-in-out',
   },

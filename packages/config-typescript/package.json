@@ -1,5 +1,5 @@
 {
-  "name": "@sendme/config-typescript",
+  "name": "@postcard/config-typescript",
   "version": "0.1.0",
   "private": true,
   "type": "module",

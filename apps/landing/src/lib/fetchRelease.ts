@@ -1,5 +1,5 @@
 /**
- * GitHub Releases fetch for the sendme installer artifacts.
+ * GitHub Releases fetch for the postcard installer artifacts.
  *
  * The landing page calls the unauthenticated REST endpoint to discover
  * the most recent release's asset URLs and sizes, then hands them to the
@@ -10,7 +10,7 @@
 
 import type { OsId } from './detectOs';
 
-export const RELEASES_URL = 'https://api.github.com/repos/index-zr0/sendme/releases/latest';
+export const RELEASES_URL = 'https://api.github.com/repos/index-zr0/postcard/releases/latest';
 
 export type ReleaseAsset = {
   os: OsId;

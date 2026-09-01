@@ -35,10 +35,10 @@ importers:
       '@preact/preset-vite':
         specifier: ^2.9.0
         version: 2.10.6(@babel/core@7.29.7)(preact@10.29.8)(rollup@4.63.1)(vite@5.4.21(lightningcss@1.33.0))
-      '@sendme/config-eslint':
+      '@postcard/config-eslint':
         specifier: workspace:*
         version: link:../../packages/config-eslint
-      '@sendme/config-typescript':
+      '@postcard/config-typescript':
         specifier: workspace:*
         version: link:../../packages/config-typescript
       '@stylexjs/unplugin':
@@ -90,10 +90,10 @@ importers:
       '@preact/preset-vite':
         specifier: ^2.9.0
         version: 2.10.6(@babel/core@7.29.7)(preact@10.29.8)(rollup@4.63.1)(vite@5.4.21(lightningcss@1.33.0))
-      '@sendme/config-eslint':
+      '@postcard/config-eslint':
         specifier: workspace:*
         version: link:../../packages/config-eslint
-      '@sendme/config-typescript':
+      '@postcard/config-typescript':
         specifier: workspace:*
         version: link:../../packages/config-typescript
       '@stylexjs/unplugin':

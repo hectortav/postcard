@@ -65,7 +65,7 @@ jobs:
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
-          name: sendme-installer-${{ matrix.os }}
+          name: postcard-installer-${{ matrix.os }}
           # .dmg / .msi / .deb live at the top of dist/installer; the
           # app-image dir is a sibling of equal interest to anyone who
           # wants the binary without an installer wrapper.
@@ -93,7 +93,7 @@ jobs:
   #       with:
   #         node-version: 20
   #     - run: pnpm install --frozen-lockfile
-  #     - run: pnpm --filter @sendme/landing build
+  #     - run: pnpm --filter @postcard/landing build
   #     - uses: actions/configure-pages@v5
   #     - uses: actions/upload-pages-artifact@v3
   #       with:

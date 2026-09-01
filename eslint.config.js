@@ -1,2 +1,2 @@
-import base from '@sendme/config-eslint';
+import base from '@postcard/config-eslint';
 export default base;
