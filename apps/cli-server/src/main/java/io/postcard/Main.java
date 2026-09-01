@@ -60,8 +60,13 @@ public final class Main {
         if (opts.authToken != null) url += (url.contains("?") ? "&" : "?") + "token=" + opts.authToken;
         System.out.println("BIND " + url);
         System.out.println(io.postcard.qr.QrRenderer.ansi(url));
-        if (!opts.noBrowser) java.awt.Desktop.getDesktop().browse(java.net.URI.create(url));
+        if (!opts.noBrowser) io.postcard.desktop.DesktopIntegration.browse(url);
         if (!opts.headless) {
+            // macOS does not re-run main() when the user clicks the Dock icon of an
+            // already-running bundled app; it sends a reopen event instead. Without
+            // this the app looks dead once the browser tab is closed.
+            io.postcard.desktop.DesktopIntegration.installReopenHandler(
+                url, io.postcard.desktop.DesktopIntegration::browse);
             // Install the menu-bar / system-tray icon. install() returns
             // Optional.empty() on platforms without a status-notifier host
             // (headless Linux, SSH sessions, CI). The desktop integration is

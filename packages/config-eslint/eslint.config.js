@@ -1,8 +1,15 @@
-import tseslint from '@typescript-eslint/eslint-plugin';
-import tsparser from '@typescript-eslint/parser';
+// TypeScript 7 (the Go-native compiler) is not supported by any released
+// typescript-eslint — both `latest` (8.69.0) and `canary` cap their peer range
+// at `typescript@<6.1.0`, and the guard is a hard error, not a suppressible
+// warning (`warnOnUnsupportedTypeScriptVersion: false` does not bypass it).
+//
+// typescript-eslint is therefore removed. Because stock ESLint cannot parse TS
+// at all without it, `.ts`/`.tsx` are no longer linted -- type checking is
+// carried entirely by `tsc --noEmit` (run via each app's `typecheck` script).
+// Restore this block when typescript-eslint ships TS 7 support, or adopt a
+// linter that parses TS natively (oxlint) if that lands first.
 import react from 'eslint-plugin-react';
 import prettier from 'eslint-config-prettier';
-import stylex from '@stylexjs/eslint-plugin';
 import globals from 'globals';
 
 const sharedIgnores = [
@@ -18,32 +25,21 @@ const sharedIgnores = [
 ];
 
 export default [
+  { ignores: sharedIgnores },
   {
-    ignores: sharedIgnores,
-  },
-  {
-    files: ['**/*.{ts,tsx}'],
+    files: ['**/*.{js,mjs,cjs}'],
     languageOptions: {
-      parser: tsparser,
-      parserOptions: {
-        ecmaVersion: 2022,
-        sourceType: 'module',
-        ecmaFeatures: { jsx: true },
-      },
+      ecmaVersion: 2022,
+      sourceType: 'module',
       globals: { ...globals.browser, ...globals.node },
     },
-    plugins: {
-      '@typescript-eslint': tseslint,
-      react,
-      '@stylexjs': stylex,
-    },
+    plugins: { react },
     settings: { react: { pragma: 'h', version: 'detect' } },
     rules: {
-      ...tseslint.configs.recommended.rules,
       ...react.configs.recommended.rules,
       'react/react-in-jsx-scope': 'off',
       'react/jsx-uses-react': 'off',
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     },
   },
   prettier,
