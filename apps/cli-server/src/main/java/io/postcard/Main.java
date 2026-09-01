@@ -60,11 +60,40 @@ public final class Main {
         if (opts.authToken != null) url += (url.contains("?") ? "&" : "?") + "token=" + opts.authToken;
         System.out.println("BIND " + url);
         System.out.println(io.postcard.qr.QrRenderer.ansi(url));
-        if (!opts.noBrowser) io.postcard.desktop.DesktopIntegration.browse(url);
+        // A dedicated browser profile is what makes the launched process track the
+        // window's lifetime; see BrowserLauncher. Only needed when we open a window.
+        final java.nio.file.Path profileDir =
+            opts.noBrowser ? null : java.nio.file.Files.createTempDirectory("postcard-profile");
+
+        // One shutdown sequence, three callers: the tray's Quit item, the app window
+        // closing, and the JVM shutdown hook. `cleanup` is safe inside a shutdown hook
+        // (no System.exit); `quit` is the user-initiated variant that also exits.
+        final Runnable cleanup = () -> {
+            try { app.jettyServer().stop(); } catch (Exception ignored) {}   // stop accepting connections
+            Shutdown.drain(3, () -> {}, () -> server.hub().close());          // drain in-flight, close hub
+            if (server.tempDir()) deleteTree(server.store().dir());
+            if (profileDir != null) deleteTree(profileDir);
+            log.info("postcard: goodbye");
+        };
+        final Runnable quit = () -> { cleanup.run(); System.exit(0); };
+
+        if (!opts.noBrowser) {
+            // Preferred: a chromeless window with its own Dock entry and close button.
+            // Falls back to an ordinary tab when no Chromium-family browser is installed.
+            var window = io.postcard.desktop.BrowserLauncher.launchAppWindow(url, profileDir);
+            if (window.isPresent()) {
+                window.get().onExit().thenRun(() -> {
+                    log.info("postcard: app window closed, shutting down");
+                    quit.run();
+                });
+            } else {
+                io.postcard.desktop.DesktopIntegration.browse(url);
+            }
+        }
         if (!opts.headless) {
             // macOS does not re-run main() when the user clicks the Dock icon of an
-            // already-running bundled app; it sends a reopen event instead. Without
-            // this the app looks dead once the browser tab is closed.
+            // already-running bundled app; it sends a reopen event instead. This matters
+            // for the fallback-tab path, where closing the tab leaves the server running.
             io.postcard.desktop.DesktopIntegration.installReopenHandler(
                 url, io.postcard.desktop.DesktopIntegration::browse);
             // Install the menu-bar / system-tray icon. install() returns
@@ -73,39 +102,20 @@ public final class Main {
             // gated behind !opts.headless so GraalVM native builds can stay
             // AWT-free by passing --headless at run time.
             java.util.Optional<java.awt.TrayIcon> trayIcon =
-                io.postcard.desktop.SystemTrayController.install(url, () -> {
-                    // Mirror the shutdown sequence from the JVM hook below so
-                    // the user can quit the daemon cleanly from the menu bar.
-                    log.info("postcard: tray quit invoked");
-                    try { app.jettyServer().stop(); } catch (Exception ignored) {}
-                    Shutdown.drain(3, () -> {}, () -> server.hub().close());
-                    if (server.tempDir()) {
-                        try {
-                            java.nio.file.Files.walk(server.store().dir())
-                                .sorted((a, b) -> b.getNameCount() - a.getNameCount())
-                                .forEach(p -> { try { java.nio.file.Files.deleteIfExists(p); } catch (Exception ignored) {} });
-                        } catch (Exception ignored) {}
-                    }
-                    log.info("postcard: goodbye");
-                    System.exit(0);
-                });
+                io.postcard.desktop.SystemTrayController.install(url, quit);
             trayIcon.ifPresent(icon -> Runtime.getRuntime().addShutdownHook(new Thread(() ->
                 io.postcard.desktop.SystemTrayController.remove(icon), "postcard-tray-remove")));
         }
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            try {
-                // 1. stop accepting new connections
-                app.jettyServer().stop();
-            } catch (Exception ignored) {}
-            // 2. drain in-flight handlers (3s budget) + 3. 1s upper bound on wait once budget is exhausted
-            Shutdown.drain(3, () -> {}, () -> {
-                // 4. close WebSocket hub
-                server.hub().close();
-            });
-            // 5. delete temp dir + log goodbye
-            if (server.tempDir()) { try { java.nio.file.Files.walk(server.store().dir()).sorted((a, b) -> b.getNameCount() - a.getNameCount()).forEach(p -> { try { java.nio.file.Files.deleteIfExists(p); } catch (Exception ignored) {} }); } catch (Exception ignored) {} }
-            log.info("postcard: goodbye");
-        }));
+        Runtime.getRuntime().addShutdownHook(new Thread(cleanup, "postcard-shutdown"));
     }
+
+    /** Best-effort recursive delete; depth-first so directories empty before removal. */
+    private static void deleteTree(java.nio.file.Path root) {
+        try (var walk = java.nio.file.Files.walk(root)) {
+            walk.sorted((a, b) -> b.getNameCount() - a.getNameCount())
+                .forEach(p -> { try { java.nio.file.Files.deleteIfExists(p); } catch (Exception ignored) {} });
+        } catch (Exception ignored) {}
+    }
+
     private static int parsePortOrZero(String p) { return p.equalsIgnoreCase("auto") ? 0 : Integer.parseInt(p); }
 }
