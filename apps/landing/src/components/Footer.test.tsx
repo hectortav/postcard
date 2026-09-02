@@ -7,7 +7,7 @@ describe('Footer', () => {
     render(<Footer />);
     const link = screen.getByRole('link', { name: /github/i });
     expect(link).toBeTruthy();
-    expect(link.getAttribute('href')).toBe('https://github.com/index-zr0/postcard');
+    expect(link.getAttribute('href')).toBe('https://github.com/hectortav/postcard');
     expect(link.getAttribute('target')).toBe('_blank');
     expect(link.getAttribute('rel')).toBe('noreferrer');
   });

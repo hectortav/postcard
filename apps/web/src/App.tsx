@@ -244,6 +244,9 @@ const styles = stylex.create({
     display: 'flex',
     gap: '4px',
     padding: '0 24px',
+    // The strip is a shade darker than the sheet, which is the only way the
+    // active tab -- which IS the sheet colour -- can read as joined to it.
+    backgroundColor: '#EBE2D0',
     borderBottom: '1px solid #D8CDB7',
     '@media (max-width: 480px)': { padding: '0 16px' },
   },
@@ -264,7 +267,7 @@ const styles = stylex.create({
     transitionDuration: '120ms',
     outline: 'none',
     userSelect: 'none',
-    ':hover': { color: '#1A1714', backgroundColor: '#EDE5D5' },
+    ':hover': { color: '#1A1714', backgroundColor: '#F0E8D9' },
     ':focus-visible': { color: '#1A1714', boxShadow: '0 0 0 2px #A8332A' },
   },
   tabActive: {

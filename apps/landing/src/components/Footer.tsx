@@ -1,14 +1,12 @@
 import stylex from '@stylexjs/stylex';
 
-const GITHUB_URL = 'https://github.com/index-zr0/postcard';
+const GITHUB_URL = 'https://github.com/hectortav/postcard';
 
 export function Footer() {
   return (
     <footer className={stylex(styles.footer)}>
-      <span className={stylex(styles.text)}>postcard</span>
-      <span className={stylex(styles.dot)} aria-hidden="true">·</span>
-      <span className={stylex(styles.text)}>by air</span>
-      <span className={stylex(styles.dot)} aria-hidden="true">·</span>
+      <span className={stylex(styles.text)}>postcard, by air</span>
+      <span className={stylex(styles.spacer)} />
       <a className={stylex(styles.link)} href={GITHUB_URL} target="_blank" rel="noreferrer">
         github
       </a>
@@ -20,29 +18,28 @@ const styles = stylex.create({
   footer: {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
-    padding: '20px 24px',
-    borderTop: '1px solid #D8CDB7',
+    gap: '12px',
+    width: '100%',
+    maxWidth: '960px',
+    marginLeft: 'auto',
+    marginRight: 'auto',
+    padding: '0 24px 40px',
+    boxSizing: 'border-box',
     color: '#8C8474',
-    fontSize: '12px',
-    '@media (max-width: 720px)': {
-      padding: '16px 20px',
-      flexWrap: 'wrap',
-    },
+    fontSize: '13px',
+    '@media (max-width: 640px)': { padding: '0 20px 32px' },
   },
   text: {
-    color: '#8C8474',
+    fontFamily: '"Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif',
+    fontStyle: 'italic',
   },
-  dot: {
-    color: '#D8CDB7',
-  },
+  spacer: { flex: '1 1 auto' },
+  dot: { display: 'none' },
   link: {
     color: '#A8332A',
-    textDecoration: 'underline',
-    textUnderlineOffset: '2px',
-    outline: 'none',
-    ':focus-visible': {
-      color: '#1A1714',
-    },
+    textDecoration: 'none',
+    borderBottom: '1px solid rgba(168,51,42,0.35)',
+    ':hover': { borderBottomColor: '#A8332A' },
+    ':focus-visible': { outline: '2px solid #A8332A', outlineOffset: '3px' },
   },
 });

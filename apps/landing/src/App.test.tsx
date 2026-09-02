@@ -41,7 +41,7 @@ describe('App', () => {
     // Footer (anchored to the index-zr0 repo URL so it doesn't collide
     // with the "GitHub releases" link in the download section)
     const footerLink = screen.getAllByRole('link').find(
-      (a) => a.getAttribute('href') === 'https://github.com/index-zr0/postcard',
+      (a) => a.getAttribute('href') === 'https://github.com/hectortav/postcard',
     );
     expect(footerLink).toBeTruthy();
     expect(footerLink?.textContent?.toLowerCase()).toBe('github');

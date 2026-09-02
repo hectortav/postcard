@@ -10,7 +10,7 @@
 
 import type { OsId } from './detectOs';
 
-export const RELEASES_URL = 'https://api.github.com/repos/index-zr0/postcard/releases/latest';
+export const RELEASES_URL = 'https://api.github.com/repos/hectortav/postcard/releases/latest';
 
 export type ReleaseAsset = {
   os: OsId;

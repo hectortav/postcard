@@ -31,7 +31,7 @@ describe('fetchLatestRelease', () => {
   it('parses a 200 response into a Release with classified assets', async () => {
     const body = {
       tag_name: 'v0.1.0',
-      html_url: 'https://github.com/index-zr0/postcard/releases/tag/v0.1.0',
+      html_url: 'https://github.com/hectortav/postcard/releases/tag/v0.1.0',
       assets: [
         { name: 'postcard-0.1.0.dmg', browser_download_url: 'https://x/mac.dmg', size: 4_000_000 },
         { name: 'postcard-setup-0.1.0.exe', browser_download_url: 'https://x/win.exe', size: 3_000_000 },

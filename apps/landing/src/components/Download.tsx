@@ -11,7 +11,7 @@ const OS_LABEL: Record<OsId, string> = {
   linux: 'Linux',
 };
 
-const RELEASES_PAGE = 'https://github.com/index-zr0/postcard/releases';
+const RELEASES_PAGE = 'https://github.com/hectortav/postcard/releases';
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -103,94 +103,79 @@ export function Download() {
 
 const styles = stylex.create({
   section: {
-    paddingLeft: '24px',
-    paddingRight: '24px',
-    paddingTop: '32px',
-    paddingBottom: '32px',
-    maxWidth: '960px',
-    marginLeft: 'auto',
-    marginRight: 'auto',
-    boxSizing: 'border-box',
-    '@media (max-width: 720px)': {
-      paddingLeft: '20px',
-      paddingRight: '20px',
-      paddingTop: '24px',
-      paddingBottom: '24px',
-    },
+    padding: '44px 32px',
+    borderBottom: '1px solid #D8CDB7',
+    '@media (max-width: 640px)': { padding: '32px 20px' },
   },
   heading: {
     fontFamily: '"Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif',
-    fontStyle: 'italic',
+    fontSize: '26px',
     fontWeight: '400',
-    fontSize: '24px',
     color: '#1A1714',
-    margin: '0 0 16px 0',
-    letterSpacing: '-0.005em',
-  },
-  help: {
-    fontSize: '14px',
-    color: '#8C8474',
-    margin: 0,
-  },
-  comingSoon: {
-    backgroundColor: '#E9E1D0',
-    border: '1px solid #D8CDB7',
-    borderRadius: '4px',
-    padding: '20px',
-  },
-  comingSoonText: {
-    fontSize: '15px',
-    color: '#1A1714',
-    margin: 0,
-  },
-  link: {
-    color: '#A8332A',
-    textDecoration: 'underline',
-    textUnderlineOffset: '2px',
+    margin: '0 0 20px 0',
   },
   buttons: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-    gap: '12px',
-    '@media (max-width: 720px)': {
-      gridTemplateColumns: '1fr',
-    },
-  },
-  button: {
     display: 'flex',
-    flexDirection: 'column',
-    gap: '4px',
-    backgroundColor: '#E9E1D0',
-    border: '1px solid #D8CDB7',
-    borderRadius: '4px',
-    padding: '16px',
-    textDecoration: 'none',
-    color: '#1A1714',
-    transitionProperty: 'border-color, background-color, box-shadow',
-    transitionDuration: '120ms',
-    outline: 'none',
-    ':focus-visible': {
-      borderColor: '#A8332A',
-      boxShadow: '0 0 0 2px #A8332A33',
-    },
+    flexWrap: 'wrap',
+    gap: '12px',
+    marginBottom: '16px',
   },
+  // Raised out of the sheet: the one thing on the page you are meant to press.
+  button: {
+    display: 'inline-flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: '2px',
+    padding: '12px 20px',
+    minHeight: '56px',
+    justifyContent: 'center',
+    backgroundColor: '#F4EEE2',
+    border: '1px solid #D8CDB7',
+    borderRadius: '10px',
+    boxShadow: '2px 2px 5px rgba(90,74,52,0.24), -2px -2px 4px #FFFBF2',
+    color: '#1A1714',
+    textDecoration: 'none',
+    fontSize: '15px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    transitionProperty: 'box-shadow, transform, background-color',
+    transitionDuration: '120ms',
+    ':hover': { backgroundColor: '#F8F3E9' },
+    // Pressing pushes it into the sheet.
+    ':active': {
+      boxShadow: 'inset 2px 2px 4px rgba(90,74,52,0.30), inset -1px -1px 3px #FFFBF2',
+      transform: 'translateY(1px)',
+    },
+    ':focus-visible': { outline: '2px solid #A8332A', outlineOffset: '3px' },
+  },
+  // The detected platform: same shape, brick face.
   buttonActive: {
-    borderColor: '#A8332A',
-    backgroundColor: '#D8CDB7',
+    backgroundColor: '#A8332A',
+    borderColor: '#8B2A22',
+    color: '#F4EEE2',
+    ':hover': { backgroundColor: '#B23A30' },
   },
   buttonDisabled: {
-    opacity: 0.5,
+    opacity: '0.5',
     cursor: 'not-allowed',
+    boxShadow: 'none',
+    ':active': { boxShadow: 'none', transform: 'none' },
   },
-  osLabel: {
-    fontSize: '15px',
-    fontWeight: '600',
-    color: '#1A1714',
+  osLabel: { fontSize: '15px', fontWeight: '500' },
+  sizeLabel: { fontSize: '12px', opacity: '0.75' },
+  help: { fontSize: '13px', color: '#8C8474', margin: '0 0 6px 0' },
+  link: {
+    color: '#A8332A',
+    textDecoration: 'none',
+    borderBottom: '1px solid rgba(168,51,42,0.35)',
+    ':hover': { borderBottomColor: '#A8332A' },
   },
-  sizeLabel: {
-    fontSize: '12px',
-    color: '#4A443C',
-    fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
-    wordBreak: 'break-all',
+  comingSoon: {
+    display: 'inline-block',
+    padding: '10px 14px',
+    borderRadius: '8px',
+    backgroundColor: '#EDE5D5',
+    boxShadow: 'inset 1px 1px 3px rgba(90,74,52,0.22)',
   },
+  comingSoonText: { fontSize: '13px', color: '#4A443C' },
 });

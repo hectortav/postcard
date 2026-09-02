@@ -48,7 +48,7 @@ describe('ComparisonTable', () => {
     it('renders the "Zero Mobile App Install" postcard value', () => {
       setViewport(1280);
       render(<ComparisonTable />);
-      expect(screen.getAllByText(/^✅ Yes$/).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/^✓ Yes$/).length).toBeGreaterThan(0);
     });
 
     it('renders the "100% Offline (No Internet)" postcard value', () => {
@@ -57,7 +57,7 @@ describe('ComparisonTable', () => {
       const section = getSection();
       const offlineRow = within(section).getByText('100% Offline (No Internet)')
         .parentElement as HTMLElement;
-      expect(offlineRow.textContent).toMatch(/✅ Yes/);
+      expect(offlineRow.textContent).toMatch(/✓ Yes/);
     });
 
     it('renders the "Executable Footprint" postcard value "< 30 MB (Native)"', () => {
@@ -100,10 +100,10 @@ describe('ComparisonTable', () => {
       expect(row.textContent).toMatch(/~80-150 MB/);
     });
 
-    it('renders "❌ Needs STUN/TURN" for Snapdrop offline row', () => {
+    it('renders "✗ Needs STUN/TURN" for Snapdrop offline row', () => {
       setViewport(1280);
       render(<ComparisonTable />);
-      expect(screen.getAllByText(/❌ Needs STUN\/TURN/).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/✗ Needs STUN\/TURN/).length).toBeGreaterThan(0);
     });
   });
 
@@ -189,8 +189,8 @@ describe('ComparisonTable', () => {
       expect(text).toMatch(/OS native/);
       expect(text).toMatch(/Web only/);
       expect(text).toMatch(/~80-150 MB/);
-      expect(text).toMatch(/✅ Yes \(Apple only\)/);
-      expect(text).toMatch(/❌ Requires App/);
+      expect(text).toMatch(/✓ Yes \(Apple only\)/);
+      expect(text).toMatch(/✗ Requires App/);
     });
   });
 });

@@ -35,6 +35,6 @@ test('landing page renders all sections and airmail stripe', async ({ page }) =>
   await expect(macButton.or(comingSoon)).toBeVisible();
 
   // Footer github link.
-  const gh = page.locator('a[href="https://github.com/index-zr0/postcard"]');
+  const gh = page.locator('a[href="https://github.com/hectortav/postcard"]');
   await expect(gh).toBeVisible();
 });
