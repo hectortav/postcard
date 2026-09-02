@@ -46,36 +46,37 @@ const styles = stylex.create({
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: '12px',
+    gap: '14px',
     textAlign: 'center',
   },
   heading: {
-    fontSize: '15px',
+    fontFamily: '"Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif',
+    fontSize: '20px',
     color: '#1A1714',
-    fontWeight: '500',
     margin: 0,
   },
+  // The code itself is a physical tile resting on the sheet -- the one place
+  // in this view where something is raised rather than pressed in.
   card: {
-    backgroundColor: '#F4EEE2',
-    padding: '16px',
-    borderRadius: '4px',
+    padding: '18px',
+    backgroundColor: '#FFFBF2',
     border: '1px solid #D8CDB7',
+    borderRadius: '12px',
+    boxShadow: '2px 2px 5px rgba(90,74,52,0.24), -2px -2px 4px #FFFBF2',
+    lineHeight: 0,
   },
-  qr: {
-    width: 'min(72vw, 280px)',
-    aspectRatio: '1',
-  },
-  sub: {
+  qr: { width: '208px', height: '208px', display: 'block' },
+  sub: { fontSize: '13px', color: '#8C8474', margin: 0 },
+  // The URL is the thing you read character by character, so it stays mono
+  // and selectable. Losing the address bar in the app window makes this the
+  // only place the URL is legible -- see the app-window design note.
+  text: {
+    fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
     fontSize: '13px',
     color: '#4A443C',
-    margin: '4px 0 0 0',
-  },
-  text: {
-    color: '#8C8474',
-    fontSize: '12px',
-    fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
-    wordBreak: 'break-all',
     margin: 0,
-    maxWidth: '320px',
+    wordBreak: 'break-all',
+    userSelect: 'all',
+    maxWidth: '34ch',
   },
 });

@@ -70,4 +70,31 @@ describe('tokens', () => {
     // The display stack should be serif (the signature element of the page)
     expect(tokens.font.display.toLowerCase()).toContain('serif');
   });
+  // Relative luminance, sRGB coefficients. Used to assert surface ordering rather
+  // than pinning hex values, so the palette can be retuned without breaking tests.
+  const lum = (hex: string): number => {
+    const r = parseInt(hex.slice(1, 3), 16) / 255;
+    const g = parseInt(hex.slice(3, 5), 16) / 255;
+    const b = parseInt(hex.slice(5, 7), 16) / 255;
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+
+  it('orders its paper surfaces by height so a card can lift off the desk', () => {
+    // The whole letterpress system depends on the ground being darker than the
+    // card. If desk >= paper, nothing can visually sit on anything.
+    expect(lum(tokens.colors.desk)).toBeLessThan(lum(tokens.colors.paper));
+    // paperHi is the lit edge of an embossed element, so it must out-shine paper.
+    expect(lum(tokens.colors.paperHi)).toBeGreaterThan(lum(tokens.colors.paper));
+  });
+
+  it('exposes letterpress depth shadows that encode direction', () => {
+    // Debossed = pressed into the sheet (inputs). Embossed = raised out of it (actions).
+    expect(tokens.shadow.deboss).toContain('inset');
+    expect(tokens.shadow.emboss).not.toContain('inset');
+    expect(tokens.shadow.lift).toBeDefined();
+  });
+
+  it('keeps a pressed state that is darker than the resting accent', () => {
+    expect(lum(tokens.colors.accentDeep)).toBeLessThan(lum(tokens.colors.accent));
+  });
 });

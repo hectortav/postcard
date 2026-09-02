@@ -1,34 +1,64 @@
 /**
- * Design tokens for the postcard web UI — the "Civvies" direction.
+ * Design tokens for postcard — the "Letterpress" direction.
  *
  * Subject: a one-shot way to move a file from one device to another on the
- * same WiFi. The page is a postcard, not a dashboard: paper, ink, a
- * single airmail-red accent. Distinct from the dark-mode-with-acid-blue
- * default that AI tooling tends to produce.
+ * same WiFi. The interface is a printed card on a desk, not a dashboard.
+ *
+ * The three requested treatments resolve into one material rather than three
+ * stacked trends: paper under a press.
+ *
+ *   skeuomorphism → the materials themselves: paper stock, a perforated
+ *                   stamp (the app icon), a card resting on a desk.
+ *   neumorphism   → what paper does under a press. Inputs are DEBOSSED into
+ *                   the sheet, actions are EMBOSSED out of it. Soft dual
+ *                   shadows, but earned by the material instead of applied
+ *                   to every element — and every surface keeps a real
+ *                   hairline border, so an edge never depends on shadow
+ *                   alone. That is the usual accessibility failure of
+ *                   neumorphism and it is designed out here.
+ *   glass         → exactly one layer, the PIN lock panel. One glass moment.
+ *
+ * Colours are taken from the app icon (icons/postcard.svg): paper #F4EEE2
+ * and airmail brick #A8332A. `desk` is the load-bearing addition — the shell
+ * used to be the same colour as a card, so nothing could lift off anything.
  *
  * Note on StyleX 0.7.5: the API does not expose `stylex.defineConsts`
  * (it exists only in newer StyleX releases). We fall back to a plain
- * TypeScript const so values are still tree-shakeable and typed. These
- * tokens are intended to be used in regular TSX code (style attributes
- * outside `stylex.create(...)` blocks, dynamic styles, and non-CSS
- * consumers). Inside `stylex.create(...)` blocks, the babel plugin
- * requires literal values and does not resolve variable references, so
- * callers should inline literals there or use `stylex.defineVars` (also
- * exposed by StyleX 0.7.5) when theming is needed.
+ * TypeScript const so values are still tree-shakeable and typed. Inside
+ * `stylex.create(...)` blocks the babel plugin requires literal values and
+ * does not resolve variable references, so callers must inline literals
+ * there and use these tokens for dynamic styles and non-CSS consumers.
  */
 
 export const tokens = {
   colors: {
+    // Surfaces, ordered by height: desk < paper < paperHi.
+    desk: '#E3D9C4',
     paper: '#F4EEE2',
+    paperHi: '#FFFBF2',
     paperDeep: '#E9E1D0',
     paperEdge: '#D8CDB7',
     ink: '#1A1714',
     inkSoft: '#4A443C',
     inkMute: '#8C8474',
     accent: '#A8332A',
+    accentDeep: '#8B2A22',
     accentSoft: '#C45F4A',
     success: '#2D6A4F',
     danger: '#8B2A2A',
+  },
+  /**
+   * Letterpress depth. Direction carries meaning, so these are not
+   * interchangeable: `deboss` marks something you put things into, `emboss`
+   * marks something you press, `lift` marks a sheet resting on the desk.
+   */
+  shadow: {
+    deboss: 'inset 2px 2px 5px rgba(90,74,52,0.26), inset -2px -2px 4px #FFFBF2',
+    debossDeep: 'inset 3px 3px 8px rgba(90,74,52,0.32), inset -2px -2px 5px #FFFBF2',
+    emboss: '2px 2px 5px rgba(90,74,52,0.24), -2px -2px 4px #FFFBF2',
+    embossPressed: 'inset 2px 2px 4px rgba(90,74,52,0.30), inset -1px -1px 3px #FFFBF2',
+    lift: '0 1px 1px rgba(90,74,52,0.10), 0 10px 28px -10px rgba(90,74,52,0.40)',
+    glass: '0 8px 32px -8px rgba(26,23,20,0.30)',
   },
   space: {
     xs: '4px',
@@ -49,10 +79,9 @@ export const tokens = {
     mono: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
   },
   size: {
-    maxWidth: '640px',
-    qr: 'min(72vw, 280px)',
-    rowMin: '56px',
-    stripe: '6px',
+    maxWidth: '960px',
+    card: '600px',
+    stripe: '4px',
   },
 } as const;
 

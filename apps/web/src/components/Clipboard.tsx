@@ -33,39 +33,35 @@ export function Clipboard({ value, onChange }: { value: string; onChange: (t: st
 }
 
 const styles = stylex.create({
-  wrap: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '8px',
-  },
+  wrap: { display: 'flex', flexDirection: 'column', gap: '8px' },
   label: {
-    fontSize: '13px',
-    color: '#1A1714',
+    fontSize: '14px',
     fontWeight: '500',
+    color: '#1A1714',
   },
-  help: {
-    fontSize: '13px',
-    color: '#8C8474',
-    margin: 0,
-  },
+  // Text goes into the sheet, so the field is pressed in.
   area: {
     width: '100%',
-    minHeight: '40vh',
-    padding: '16px',
-    backgroundColor: '#E9E1D0',
-    color: '#1A1714',
-    border: '1px solid #D8CDB7',
-    borderRadius: '4px',
-    fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
-    fontSize: '15px',
-    lineHeight: '1.5',
+    minHeight: '200px',
     boxSizing: 'border-box',
+    padding: '14px 16px',
+    backgroundColor: '#EDE5D5',
+    border: '1px solid #D8CDB7',
+    borderRadius: '10px',
+    boxShadow: 'inset 2px 2px 5px rgba(90,74,52,0.26), inset -2px -2px 4px #FFFBF2',
+    color: '#1A1714',
+    fontSize: '15px',
+    lineHeight: '1.55',
+    fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
     resize: 'vertical',
-    marginTop: '8px',
     outline: 'none',
+    transitionProperty: 'border-color, box-shadow',
+    transitionDuration: '140ms',
+    '::placeholder': { color: '#8C8474' },
     ':focus': {
       borderColor: '#A8332A',
-      boxShadow: '0 0 0 2px #A8332A33',
+      boxShadow: 'inset 2px 2px 5px rgba(90,74,52,0.26), inset -2px -2px 4px #FFFBF2, 0 0 0 3px rgba(168,51,42,0.28)',
     },
   },
+  help: { fontSize: '12px', color: '#8C8474', margin: 0 },
 });

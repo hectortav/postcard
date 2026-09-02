@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'preact/hooks';
 import stylex from '@stylexjs/stylex';
+import { Stamp } from './Stamp';
 
 // The shake animation is a single, component-local keyframe rule. The
 // StyleX 0.17.5 babel plugin restricts `stylex.create` style values to
@@ -155,6 +156,9 @@ export function PinLockScreen({ pinLength, onVerified, verify }: Props) {
 
   return (
     <div className={stylex(styles.shell)} role="dialog" aria-modal="true" aria-labelledby="pin-heading">
+      <div className={stylex(styles.watermark)} aria-hidden="true">
+        <Stamp size={440} hole="#E3D9C4" title="" />
+      </div>
       <style dangerouslySetInnerHTML={{ __html: SHAKE_CSS }} />
       <div className={stylex(styles.card, shake > 0 && styles.cardShake)} key={shake} data-shake={shake}>
         <div className={stylex(styles.stripe)} aria-hidden="true" />
@@ -206,94 +210,98 @@ function formatMs(ms: number): string {
 }
 
 const styles = stylex.create({
+  // The desk, with a faint stamp watermark. The watermark exists so the frosted
+  // panel has something to refract -- backdrop-filter over a flat colour is
+  // invisible, which is how "glass" usually ends up as decoration.
   shell: {
+    position: 'relative',
     minHeight: '100vh',
+    width: '100%',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     padding: '24px',
-    backgroundColor: '#F4EEE2',
     boxSizing: 'border-box',
+    backgroundColor: '#E3D9C4',
+    overflow: 'hidden',
   },
+  watermark: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%) rotate(-8deg)',
+    opacity: '0.18',
+    pointerEvents: 'none',
+    lineHeight: 0,
+  },
+  // The one glass surface in the product.
   card: {
+    position: 'relative',
     width: '100%',
-    maxWidth: '360px',
-    backgroundColor: '#E9E1D0',
-    borderRadius: '4px',
-    padding: '24px 20px 20px 20px',
-    boxShadow: '0 2px 12px rgba(26, 23, 20, 0.08)',
-    textAlign: 'center',
+    maxWidth: '380px',
+    padding: '30px 26px 26px',
     boxSizing: 'border-box',
+    borderRadius: '16px',
+    backgroundColor: 'rgba(244,238,226,0.72)',
+    backdropFilter: 'blur(18px) saturate(1.25)',
+    WebkitBackdropFilter: 'blur(18px) saturate(1.25)',
+    border: '1px solid rgba(255,251,242,0.65)',
+    boxShadow: '0 8px 32px -8px rgba(26,23,20,0.30)',
+    overflow: 'hidden',
+    textAlign: 'center',
   },
   cardShake: {
-    animationName: 'postcard-pin-shake',
-    animationDuration: '300ms',
+    animationName: stylex.keyframes({
+      '0%, 100%': { transform: 'translateX(0)' },
+      '20%': { transform: 'translateX(-7px)' },
+      '40%': { transform: 'translateX(6px)' },
+      '60%': { transform: 'translateX(-4px)' },
+      '80%': { transform: 'translateX(2px)' },
+    }),
+    animationDuration: '320ms',
     animationTimingFunction: 'ease-in-out',
+    '@media (prefers-reduced-motion: reduce)': { animationName: 'none' },
   },
   stripe: {
-    height: '4px',
-    marginLeft: '-20px',
-    marginRight: '-20px',
-    marginTop: '-24px',
-    marginBottom: '16px',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '5px',
     backgroundImage:
-      'repeating-linear-gradient(90deg, #A8332A 0 12px, #1F3A5F 12px 24px, #A8332A 24px 36px)',
+      'repeating-linear-gradient(135deg, #A8332A 0 10px, #1A1714 10px 20px)',
   },
   heading: {
-    fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-    fontSize: '15px',
-    fontWeight: '500',
-    color: '#1A1714',
-    margin: '0 0 4px 0',
-    lineHeight: '1.35',
-  },
-  sub: {
-    fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-    fontSize: '12px',
-    color: '#8C8474',
-    margin: '0 0 20px 0',
-  },
-  boxes: {
-    display: 'flex',
-    justifyContent: 'center',
-    gap: '8px',
-    marginBottom: '12px',
-  },
-  box: {
-    width: '44px',
-    height: '52px',
-    borderRadius: '4px',
-    border: '1px solid #D8CDB7',
-    backgroundColor: '#F4EEE2',
-    color: '#1A1714',
-    fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
+    fontFamily: '"Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif',
     fontSize: '22px',
+    fontWeight: '400',
+    color: '#1A1714',
+    margin: '0 0 6px 0',
+  },
+  sub: { fontSize: '13px', color: '#4A443C', margin: '0 0 22px 0' },
+  boxes: { display: 'flex', gap: '10px', justifyContent: 'center' },
+  // Digits are pressed into the sheet.
+  box: {
+    width: '54px',
+    height: '64px',
     textAlign: 'center',
-    padding: '0',
+    fontSize: '26px',
+    fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
+    color: '#1A1714',
+    backgroundColor: 'rgba(237,229,213,0.85)',
+    border: '1px solid #D8CDB7',
+    borderRadius: '10px',
+    boxShadow: 'inset 2px 2px 5px rgba(90,74,52,0.26), inset -2px -2px 4px rgba(255,251,242,0.9)',
     outline: 'none',
-    transitionProperty: ['borderColor', 'boxShadow'],
-    transitionDuration: '120ms',
+    transitionProperty: 'border-color, box-shadow, opacity',
+    transitionDuration: '140ms',
     ':focus': {
       borderColor: '#A8332A',
-      boxShadow: '0 0 0 2px #A8332A33',
+      boxShadow: 'inset 2px 2px 5px rgba(90,74,52,0.26), inset -2px -2px 4px rgba(255,251,242,0.9), 0 0 0 3px rgba(168,51,42,0.30)',
     },
   },
-  boxDisabled: {
-    backgroundColor: '#D8CDB7',
-    color: '#8C8474',
-    cursor: 'not-allowed',
-  },
-  boxBusy: {
-    opacity: '0.6',
-  },
-  error: {
-    fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-    fontSize: '13px',
-    color: '#8B2A2A',
-    margin: '8px 0 0 0',
-  },
-  errorLockout: {
-    color: '#A8332A',
-    fontWeight: '500',
-  },
+  boxBusy: { opacity: '0.55' },
+  boxDisabled: { opacity: '0.4', cursor: 'not-allowed' },
+  error: { marginTop: '18px', marginBottom: 0, fontSize: '13px', color: '#8B2A2A' },
+  errorLockout: { color: '#1A1714', fontWeight: '500' },
 });

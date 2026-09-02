@@ -19,12 +19,15 @@ import java.util.function.Predicate;
  * <p>Two flags do the work:
  * <ul>
  *   <li>{@code --app=<url>} creates the window without a tab strip or omnibox.</li>
- *   <li>{@code --user-data-dir=<dir>} is the non-obvious one. Without it, launching a browser
- *       that is <em>already running</em> hands the URL to the existing process and the new
- *       process exits immediately — leaving no handle whose lifetime tracks the window. A
- *       dedicated profile forces a separate process, which is what lets the caller treat
- *       "process exited" as "user closed the window".</li>
+ *   <li>{@code --no-first-run} / {@code --no-default-browser-check} suppress Chrome's welcome
+ *       and default-browser prompts, which would otherwise appear inside the app window.</li>
  * </ul>
+ *
+ * <p>Deliberately <em>not</em> passed: {@code --user-data-dir}. A dedicated profile would give a
+ * process whose lifetime tracks the window, but it starts a second Chrome application instance
+ * with its own generic Chrome icon in the Dock next to postcard's, and clicking that icon opens
+ * the empty profile's homepage. Reusing the user's own Chrome keeps the Dock clean; window
+ * lifetime is observed by {@link IdleWatcher} instead.
  *
  * <p>Only Chromium-family browsers support {@code --app}. When none is installed the caller
  * should fall back to {@link DesktopIntegration#browse(String)} and a normal tab.
@@ -104,17 +107,13 @@ public final class BrowserLauncher {
     }
 
     /** The argv for a chromeless window. Split out from launching so it can be asserted directly. */
-    public static List<String> appWindowCommand(Path browser, String url, Path profileDir) {
+    public static List<String> appWindowCommand(Path browser, String url) {
         Objects.requireNonNull(browser, "browser");
         Objects.requireNonNull(url, "url");
-        Objects.requireNonNull(profileDir, "profileDir");
         if (url.isBlank()) throw new IllegalArgumentException("url must not be blank");
         return List.of(
             browser.toString(),
             "--app=" + url,
-            "--user-data-dir=" + profileDir,
-            // A first run of a fresh profile otherwise shows Chrome's welcome/default-browser
-            // prompts inside the app window.
             "--no-first-run",
             "--no-default-browser-check");
     }
@@ -122,17 +121,21 @@ public final class BrowserLauncher {
     /**
      * Launch the dashboard in a chromeless window.
      *
-     * @return the browser process, whose exit means the user closed the window, or empty when
-     *         no Chromium-family browser is installed or the launch failed. Never throws.
+     * <p>The returned process is <em>not</em> a window handle: when the user's browser is already
+     * running it delegates and exits immediately. Window lifetime is observed by
+     * {@link IdleWatcher} instead. The return value only reports whether the launch was attempted.
+     *
+     * @return the launched process, or empty when no Chromium-family browser is installed or the
+     *         launch failed. Never throws.
      */
-    public static Optional<Process> launchAppWindow(String url, Path profileDir) {
+    public static Optional<Process> launchAppWindow(String url) {
         try {
             var browser = findInstalled();
             if (browser.isEmpty()) {
                 log.info("postcard: no Chromium-family browser found; opening a normal tab");
                 return Optional.empty();
             }
-            var cmd = appWindowCommand(browser.get(), url, profileDir);
+            var cmd = appWindowCommand(browser.get(), url);
             log.info("postcard: opening app window via {}", browser.get());
             return Optional.of(new ProcessBuilder(cmd).redirectErrorStream(true).start());
         } catch (Exception e) {

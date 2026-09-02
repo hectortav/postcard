@@ -127,7 +127,11 @@ public final class SystemTrayController {
             // and UnsupportedOperationException on platforms without a registered
             // handler (rare). Both are logged at WARN; the user can copy the URL
             // via the next menu item.
-            java.awt.Desktop.getDesktop().browse(URI.create(url));
+            // Prefer the chromeless app window, so the tray reopens the same surface
+            // the app started with rather than dropping the user into a browser tab.
+            if (BrowserLauncher.launchAppWindow(url).isEmpty()) {
+                java.awt.Desktop.getDesktop().browse(URI.create(url));
+            }
             log.info("postcard tray: opened dashboard ({})", url);
         } catch (Exception e) {
             log.warn("postcard tray: could not open browser ({}); user should copy URL from menu", e.getMessage());

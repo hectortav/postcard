@@ -60,42 +60,30 @@ public final class Main {
         if (opts.authToken != null) url += (url.contains("?") ? "&" : "?") + "token=" + opts.authToken;
         System.out.println("BIND " + url);
         System.out.println(io.postcard.qr.QrRenderer.ansi(url));
-        // A dedicated browser profile is what makes the launched process track the
-        // window's lifetime; see BrowserLauncher. Only needed when we open a window.
-        final java.nio.file.Path profileDir =
-            opts.noBrowser ? null : java.nio.file.Files.createTempDirectory("postcard-profile");
-
-        // One shutdown sequence, three callers: the tray's Quit item, the app window
-        // closing, and the JVM shutdown hook. `cleanup` is safe inside a shutdown hook
-        // (no System.exit); `quit` is the user-initiated variant that also exits.
+        // One shutdown sequence, three callers: the tray's Quit item, the idle watcher,
+        // and the JVM shutdown hook. `cleanup` is safe inside a shutdown hook (no
+        // System.exit); `quit` is the user-initiated variant that also exits.
         final Runnable cleanup = () -> {
             try { app.jettyServer().stop(); } catch (Exception ignored) {}   // stop accepting connections
             Shutdown.drain(3, () -> {}, () -> server.hub().close());          // drain in-flight, close hub
             if (server.tempDir()) deleteTree(server.store().dir());
-            if (profileDir != null) deleteTree(profileDir);
             log.info("postcard: goodbye");
         };
         final Runnable quit = () -> { cleanup.run(); System.exit(0); };
 
-        if (!opts.noBrowser) {
-            // Preferred: a chromeless window with its own Dock entry and close button.
-            // Falls back to an ordinary tab when no Chromium-family browser is installed.
-            var window = io.postcard.desktop.BrowserLauncher.launchAppWindow(url, profileDir);
-            if (window.isPresent()) {
-                window.get().onExit().thenRun(() -> {
-                    log.info("postcard: app window closed, shutting down");
-                    quit.run();
-                });
-            } else {
-                io.postcard.desktop.DesktopIntegration.browse(url);
+        // Open the dashboard as a chromeless window where possible, falling back to an
+        // ordinary tab when no Chromium-family browser is installed.
+        final java.util.function.Consumer<String> openDashboard = u -> {
+            if (io.postcard.desktop.BrowserLauncher.launchAppWindow(u).isEmpty()) {
+                io.postcard.desktop.DesktopIntegration.browse(u);
             }
-        }
+        };
+
+        if (!opts.noBrowser) openDashboard.accept(url);
         if (!opts.headless) {
             // macOS does not re-run main() when the user clicks the Dock icon of an
-            // already-running bundled app; it sends a reopen event instead. This matters
-            // for the fallback-tab path, where closing the tab leaves the server running.
-            io.postcard.desktop.DesktopIntegration.installReopenHandler(
-                url, io.postcard.desktop.DesktopIntegration::browse);
+            // already-running bundled app; it sends a reopen event instead.
+            io.postcard.desktop.DesktopIntegration.installReopenHandler(url, openDashboard);
             // Install the menu-bar / system-tray icon. install() returns
             // Optional.empty() on platforms without a status-notifier host
             // (headless Linux, SSH sessions, CI). The desktop integration is
@@ -105,6 +93,16 @@ public final class Main {
                 io.postcard.desktop.SystemTrayController.install(url, quit);
             trayIcon.ifPresent(icon -> Runtime.getRuntime().addShutdownHook(new Thread(() ->
                 io.postcard.desktop.SystemTrayController.remove(icon), "postcard-tray-remove")));
+        }
+        // Closing the last dashboard makes postcard quit. Connected clients -- including a
+        // phone that still has the page open -- keep it alive, which is the behaviour
+        // watching the browser process could never get right.
+        if (!opts.noBrowser && !opts.headless) {
+            io.postcard.desktop.IdleWatcher.start(
+                () -> server.hub().size(),
+                java.time.Duration.ofSeconds(2),
+                java.time.Duration.ofSeconds(20),
+                quit);
         }
         Runtime.getRuntime().addShutdownHook(new Thread(cleanup, "postcard-shutdown"));
     }

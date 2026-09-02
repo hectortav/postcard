@@ -86,6 +86,8 @@ export function DropZone() {
 }
 
 const styles = stylex.create({
+  // A well pressed into the sheet. The deboss is the affordance -- this is a
+  // place you put things into -- so no dashed border is needed to say so.
   zone: {
     display: 'flex',
     flexDirection: 'column',
@@ -93,30 +95,33 @@ const styles = stylex.create({
     justifyContent: 'center',
     gap: '8px',
     padding: '32px 20px',
-    backgroundColor: '#E9E1D0',
-    border: '2px dashed #D8CDB7',
-    borderRadius: '4px',
+    backgroundColor: '#EDE5D5',
+    border: '1px solid #D8CDB7',
+    borderRadius: '10px',
+    boxShadow: 'inset 2px 2px 5px rgba(90,74,52,0.26), inset -2px -2px 4px #FFFBF2',
     textAlign: 'center',
     cursor: 'pointer',
     color: '#4A443C',
-    minHeight: '160px',
+    minHeight: '164px',
     transitionProperty: 'background-color, border-color, box-shadow',
-    transitionDuration: '120ms',
+    transitionDuration: '140ms',
     outline: 'none',
     ':focus-visible': {
       borderColor: '#A8332A',
-      boxShadow: '0 0 0 2px #A8332A33',
+      boxShadow: 'inset 2px 2px 5px rgba(90,74,52,0.26), inset -2px -2px 4px #FFFBF2, 0 0 0 3px rgba(168,51,42,0.30)',
     },
   },
+  // Dragging over presses the well deeper.
   zoneHover: {
-    backgroundColor: '#D8CDB7',
+    backgroundColor: '#E7DDC8',
     borderColor: '#A8332A',
+    boxShadow: 'inset 3px 3px 8px rgba(90,74,52,0.32), inset -2px -2px 5px #FFFBF2',
   },
   glyph: {
-    fontSize: '28px',
+    fontSize: '30px',
     color: '#A8332A',
     lineHeight: '1',
-    marginBottom: '4px',
+    marginBottom: '2px',
   },
   headline: {
     fontSize: '16px',
@@ -136,7 +141,7 @@ const styles = stylex.create({
     gap: '6px',
     width: '100%',
     maxWidth: '320px',
-    marginTop: '12px',
+    marginTop: '14px',
   },
   progressName: {
     fontSize: '13px',
@@ -144,17 +149,22 @@ const styles = stylex.create({
     fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
     wordBreak: 'break-all',
   },
+  // Debossed track, raised fill -- the same depth grammar as the rest.
   progressBar: {
     width: '100%',
-    height: '4px',
-    backgroundColor: '#D8CDB7',
-    borderRadius: '2px',
+    height: '6px',
+    backgroundColor: '#E3D9C4',
+    borderRadius: '999px',
     overflow: 'hidden',
+    boxShadow: 'inset 1px 1px 3px rgba(90,74,52,0.30)',
   },
   progressFill: {
     display: 'block',
     height: '100%',
+    borderRadius: '999px',
     backgroundColor: '#A8332A',
+    transitionProperty: 'width',
+    transitionDuration: '160ms',
   },
   progressPct: {
     fontSize: '12px',

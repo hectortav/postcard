@@ -50,28 +50,29 @@ class BrowserLauncherTest {
             "expected .exe paths, got " + candidates);
     }
 
-    @Test void appWindowCommandRequestsAChromelessWindowWithItsOwnProfile() {
+    @Test void appWindowCommandRequestsAChromelessWindowInTheUsersOwnChrome() {
         var cmd = BrowserLauncher.appWindowCommand(
             Path.of("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
-            "http://192.168.1.5:8080/",
-            Path.of("/tmp/postcard-profile"));
+            "http://192.168.1.5:8080/");
 
         assertEquals("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", cmd.getFirst(),
             "the browser executable must be argv[0]");
         assertTrue(cmd.contains("--app=http://192.168.1.5:8080/"),
             "--app is what removes the tab strip and omnibox; got " + cmd);
-        // Without a dedicated profile an already-running Chrome absorbs the launch and
-        // the new process exits immediately, leaving nothing to watch for window-close.
-        assertTrue(cmd.contains("--user-data-dir=/tmp/postcard-profile"),
-            "a dedicated profile is what makes the process track the window; got " + cmd);
+        // A dedicated --user-data-dir would give us a process whose lifetime tracks the
+        // window, but it starts a SECOND Chrome application instance, which shows up as
+        // its own generic Chrome icon in the Dock next to postcard's. Clicking that icon
+        // opens the empty profile's homepage. Window lifetime is tracked by WebSocket
+        // idleness instead (see IdleWatcher), so the flag must stay off.
+        assertFalse(cmd.stream().anyMatch(a -> a.startsWith("--user-data-dir")),
+            "must reuse the user's own Chrome profile; got " + cmd);
     }
 
     @Test void appWindowCommandRejectsABlankUrl() {
         var browser = Path.of("/usr/bin/chromium");
-        var profile = Path.of("/tmp/p");
         assertThrows(IllegalArgumentException.class,
-            () -> BrowserLauncher.appWindowCommand(browser, "  ", profile));
+            () -> BrowserLauncher.appWindowCommand(browser, "  "));
         assertThrows(NullPointerException.class,
-            () -> BrowserLauncher.appWindowCommand(browser, null, profile));
+            () -> BrowserLauncher.appWindowCommand(browser, null));
     }
 }

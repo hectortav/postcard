@@ -5,6 +5,7 @@ import { useWakeLock } from './hooks/useWakeLock';
 import { DropZone } from './components/DropZone';
 import { FileList } from './components/FileList';
 import { Clipboard } from './components/Clipboard';
+import { Stamp } from './components/Stamp';
 import { QRCode } from './components/QRCode';
 import { PinLockScreen, type VerifyResult } from './components/PinLockScreen';
 import type { FileEntry, PostcardMode } from './types';
@@ -108,11 +109,15 @@ export function App() {
           onVerified={handlePinVerified}
         />
       ) : (
-        <>
-          <header className={stylex(styles.header)}>
-            <div className={stylex(styles.stripe)} aria-hidden="true" />
-            <h1 className={stylex(styles.title)}>postcard.</h1>
-            <p className={stylex(styles.subtitle)}>a one-shot way to move a file between two devices on the same wifi</p>
+        <div className={stylex(styles.card)}>
+          <header className={stylex(styles.masthead)}>
+            <div className={stylex(styles.mastheadText)}>
+              <h1 className={stylex(styles.title)}>postcard.</h1>
+              <p className={stylex(styles.subtitle)}>
+                a one-shot way to move a file between two devices on the same wifi
+              </p>
+            </div>
+            <Stamp size={44} hole="#F4EEE2" />
           </header>
           <nav className={stylex(styles.tabs)} role="tablist">
             {TABS.map((t) => (
@@ -161,151 +166,150 @@ export function App() {
             <span className={stylex(styles.mode)}>
               {mode === 'hotspot' ? 'Hotspot' : 'LAN'}
             </span>
-            <span className={stylex(styles.dot)} aria-hidden="true">·</span>
             <span className={stylex(styles.bind)}>{location.host}</span>
             <span className={stylex(styles.spacer)} />
             <span className={stylex(styles.signoff)}>by air</span>
           </footer>
-        </>
+        </div>
       )}
     </div>
   );
 }
 
 const styles = stylex.create({
+  // The desk. Darker than the card so the sheet has something to rest on --
+  // this separation is what the whole letterpress system depends on.
   shell: {
     minHeight: '100vh',
-    backgroundColor: '#F4EEE2',
+    backgroundColor: '#E3D9C4',
     color: '#1A1714',
     fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
     display: 'flex',
     flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    padding: '32px 24px',
+    boxSizing: 'border-box',
     WebkitFontSmoothing: 'antialiased',
     textRendering: 'optimizeLegibility',
+    '@media (max-width: 560px)': { padding: '0' },
   },
-  header: {
-    paddingTop: '20px',
-    paddingBottom: '20px',
-    paddingLeft: '24px',
-    paddingRight: '24px',
-    '@media (max-width: 480px)': {
-      paddingTop: '16px',
-      paddingBottom: '16px',
-      paddingLeft: '20px',
-      paddingRight: '20px',
+  // The sheet.
+  card: {
+    width: '100%',
+    maxWidth: '600px',
+    display: 'flex',
+    flexDirection: 'column',
+    backgroundColor: '#F4EEE2',
+    border: '1px solid #D8CDB7',
+    borderRadius: '12px',
+    boxShadow: '0 1px 1px rgba(90,74,52,0.10), 0 10px 28px -10px rgba(90,74,52,0.40)',
+    overflow: 'hidden',
+    '@media (max-width: 560px)': {
+      minHeight: '100vh',
+      borderRadius: '0',
+      border: 'none',
+      boxShadow: 'none',
     },
   },
-  stripe: {
-    height: '4px',
-    marginLeft: '-24px',
-    marginRight: '-24px',
-    marginBottom: '20px',
-    backgroundImage:
-      'repeating-linear-gradient(90deg, #A8332A 0 12px, #1F3A5F 12px 24px, #A8332A 24px 36px)',
-    '@media (max-width: 480px)': {
-      marginLeft: '-20px',
-      marginRight: '-20px',
-    },
+  masthead: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: '20px',
+    padding: '24px 24px 18px',
+    '@media (max-width: 480px)': { padding: '20px 20px 16px' },
   },
+  mastheadText: { minWidth: 0 },
   title: {
     fontFamily: '"Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif',
     fontStyle: 'italic',
     fontWeight: '400',
-    fontSize: 'clamp(40px, 8vw, 60px)',
+    fontSize: 'clamp(34px, 7vw, 46px)',
     lineHeight: '1',
     margin: '0 0 8px 0',
     color: '#1A1714',
-    letterSpacing: '-0.01em',
+    letterSpacing: '-0.015em',
   },
   subtitle: {
-    fontSize: '15px',
-    lineHeight: '1.45',
+    fontSize: '14px',
+    lineHeight: '1.5',
     color: '#4A443C',
     margin: 0,
-    maxWidth: '34ch',
+    maxWidth: '38ch',
   },
+  // Index-card tabs: the active one joins the sheet below it, so the divider
+  // breaks under it rather than the tab wearing a coloured underline.
   tabs: {
     display: 'flex',
-    gap: '0',
-    paddingLeft: '24px',
-    paddingRight: '24px',
+    gap: '4px',
+    padding: '0 24px',
     borderBottom: '1px solid #D8CDB7',
-    backgroundColor: '#F4EEE2',
-    position: 'sticky',
-    top: 0,
-    zIndex: 1,
-    '@media (max-width: 480px)': {
-      paddingLeft: '20px',
-      paddingRight: '20px',
-    },
+    '@media (max-width: 480px)': { padding: '0 16px' },
   },
   tab: {
+    position: 'relative',
+    bottom: '-1px',
     background: 'transparent',
     color: '#8C8474',
-    border: 'none',
-    borderBottom: '2px solid transparent',
-    padding: '14px 16px',
-    marginBottom: '-1px',
+    border: '1px solid transparent',
+    borderTopLeftRadius: '8px',
+    borderTopRightRadius: '8px',
+    padding: '12px 18px',
     cursor: 'pointer',
-    fontSize: '15px',
+    fontSize: '14px',
     fontFamily: 'inherit',
-    minHeight: '48px',
-    transitionProperty: 'color, border-color',
+    minHeight: '44px',
+    transitionProperty: 'color, background-color',
     transitionDuration: '120ms',
     outline: 'none',
     userSelect: 'none',
-    // Text colour is the only hover cue — no background change. The 2px
-    // bottom border is reserved for the active state, so it stays
-    // transparent on every other tab.
-    ':hover': {
-      color: '#1A1714',
-    },
-    ':focus-visible': {
-      color: '#1A1714',
-      borderBottomColor: '#A8332A',
-    },
+    ':hover': { color: '#1A1714', backgroundColor: '#EDE5D5' },
+    ':focus-visible': { color: '#1A1714', boxShadow: '0 0 0 2px #A8332A' },
   },
   tabActive: {
     color: '#1A1714',
-    borderBottomColor: '#A8332A',
     fontWeight: '500',
+    backgroundColor: '#F4EEE2',
+    borderColor: '#D8CDB7',
+    borderBottomColor: '#F4EEE2',
+    ':hover': { backgroundColor: '#F4EEE2' },
   },
   main: {
     padding: '24px',
     flex: '1 0 auto',
-    maxWidth: '640px',
     width: '100%',
-    marginLeft: 'auto',
-    marginRight: 'auto',
     boxSizing: 'border-box',
-    '@media (max-width: 480px)': {
-      padding: '20px 16px',
-    },
+    '@media (max-width: 480px)': { padding: '20px 16px' },
   },
   footer: {
     display: 'flex',
-    gap: '8px',
+    gap: '10px',
     alignItems: 'center',
-    padding: '14px 24px',
+    padding: '12px 24px',
     borderTop: '1px solid #D8CDB7',
+    backgroundColor: '#EFE7D8',
     color: '#8C8474',
     fontSize: '12px',
-    '@media (max-width: 480px)': {
-      padding: '12px 20px',
-      flexWrap: 'wrap',
-    },
+    '@media (max-width: 480px)': { padding: '12px 16px', flexWrap: 'wrap' },
   },
+  // A pressed-in chip, not a shouty uppercase label.
   mode: {
     color: '#A8332A',
     fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: '0.06em',
     fontSize: '11px',
+    padding: '3px 8px',
+    borderRadius: '999px',
+    backgroundColor: '#F4EEE2',
+    boxShadow: 'inset 1px 1px 3px rgba(90,74,52,0.22), inset -1px -1px 2px #FFFBF2',
   },
-  dot: { color: '#D8CDB7' },
   bind: {
     fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
     color: '#4A443C',
+    minWidth: 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
   },
   spacer: { flex: '1 1 auto' },
   signoff: {
