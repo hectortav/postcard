@@ -64,7 +64,7 @@ public final class Main {
         // and the JVM shutdown hook. `cleanup` is safe inside a shutdown hook (no
         // System.exit); `quit` is the user-initiated variant that also exits.
         final Runnable cleanup = () -> {
-            try { app.jettyServer().stop(); } catch (Exception ignored) {}   // stop accepting connections
+            try { app.jettyServer().stop(); } catch (Exception _) {}   // stop accepting connections
             Shutdown.drain(3, () -> {}, () -> server.hub().close());          // drain in-flight, close hub
             if (server.tempDir()) deleteTree(server.store().dir());
             log.info("postcard: goodbye");
@@ -111,8 +111,8 @@ public final class Main {
     private static void deleteTree(java.nio.file.Path root) {
         try (var walk = java.nio.file.Files.walk(root)) {
             walk.sorted((a, b) -> b.getNameCount() - a.getNameCount())
-                .forEach(p -> { try { java.nio.file.Files.deleteIfExists(p); } catch (Exception ignored) {} });
-        } catch (Exception ignored) {}
+                .forEach(p -> { try { java.nio.file.Files.deleteIfExists(p); } catch (Exception _) {} });
+        } catch (Exception _) {}
     }
 
     private static int parsePortOrZero(String p) { return p.equalsIgnoreCase("auto") ? 0 : Integer.parseInt(p); }

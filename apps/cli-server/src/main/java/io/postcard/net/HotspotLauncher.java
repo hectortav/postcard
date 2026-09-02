@@ -43,7 +43,7 @@ public final class HotspotLauncher {
                 var ni = en.nextElement();
                 if (ni.isUp() && !ni.isLoopback() && !ni.isVirtual() && ni.getName().startsWith("wl")) return ni.getName();
             }
-        } catch (Exception ignored) {}
+        } catch (Exception _) {}
         return "wlan0";
     }
     private static String random(int n) { var sb = new StringBuilder(); for (int i = 0; i < n; i++) sb.append(ALPHA.charAt(RNG.nextInt(ALPHA.length()))); return sb.toString(); }

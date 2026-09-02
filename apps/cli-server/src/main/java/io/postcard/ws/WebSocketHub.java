@@ -46,19 +46,19 @@ public final class WebSocketHub {
             if (q == null) continue; // removed between iteration and dispatch
             if (!q.offer(json)) {
                 // slow consumer: close + drop from hub so we don't keep hammering it
-                try { s.close(SLOW_CLOSE_CODE, "slow consumer"); } catch (Exception ignored) {}
+                try { s.close(SLOW_CLOSE_CODE, "slow consumer"); } catch (Exception _) {}
                 sessions.remove(s);
                 queues.remove(s);
                 continue;
             }
-            try { s.send(json); } catch (Exception ignored) {}
+            try { s.send(json); } catch (Exception _) {}
         }
     }
 
     public void close() {
         for (var s : sessions.keySet()) {
             pool.submit(() -> {
-                try { s.close(1001, "server shutdown"); } catch (Exception ignored) {}
+                try { s.close(1001, "server shutdown"); } catch (Exception _) {}
             });
         }
         sessions.clear();

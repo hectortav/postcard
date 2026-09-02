@@ -215,7 +215,7 @@ public final class Server {
                 }
                 var adapter = new io.postcard.ws.PostcardSession() {
                     public void send(String json) { try { ctx.send(json); } catch (Exception e) { throw new RuntimeException(e); } }
-                    public void close(int code, String reason) { try { ctx.closeSession(code, reason); } catch (Exception ignored) {} }
+                    public void close(int code, String reason) { try { ctx.closeSession(code, reason); } catch (Exception _) {} }
                 };
                 sessionByJavalinSession.put(ctx, adapter);
                 hub.add(adapter);
@@ -234,7 +234,7 @@ public final class Server {
                     }
                     sb.append("}");
                     adapter.send(sb.toString());
-                } catch (Exception ignored) {
+                } catch (Exception _) {
                     // If snapshot build fails (e.g. disk read error), close the session.
                     try { ctx.closeSession(1011, "internal error"); } catch (Exception ignored2) {}
                 }
@@ -248,7 +248,7 @@ public final class Server {
                         setClipboard(t);
                         hub.broadcast("{\"type\":\"clipboard\",\"text\":\"" + json(t) + "\"}");
                     }
-                } catch (Exception ignored) {
+                } catch (Exception _) {
                     // Malformed JSON: drop the frame, keep the session open.
                 }
             });

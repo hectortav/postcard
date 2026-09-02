@@ -45,7 +45,7 @@ for the implementation plan.
 
 ## Building installers
 
-`apps/cli-server` exposes four `Exec` tasks that wrap the JDK 21 toolchain's
+`apps/cli-server` exposes four `Exec` tasks that wrap the JDK 25 toolchain's
 `jpackage` to produce platform-native installers. The shadow JAR + bundled JRE
 are emitted first; the three platform tasks then wrap that into an installer.
 
@@ -71,7 +71,7 @@ at `0.x` for marketing.
 Notes:
 - The `.dmg` / `.msi` are **unsigned**; first-launch Gatekeeper / SmartScreen
   warnings are expected. Code signing is a v0.2+ concern.
-- The bundled JRE is the full JDK 21 runtime (~170 MB on disk before DMG
+- The bundled JRE is the full JDK 25 runtime (~170 MB on disk before DMG
   compression). A `jlink`-stripped runtime is a future enhancement.
 
 ## Release workflow

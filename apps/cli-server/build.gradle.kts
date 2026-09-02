@@ -3,14 +3,14 @@ plugins {
     application
     jacoco
     id("com.gradleup.shadow") version "9.0.0"
-    id("org.graalvm.buildtools.native") version "0.10.2"
+    id("org.graalvm.buildtools.native") version "0.11.0"
 }
 
 group = "io.postcard"
 version = "0.1.0"
 
 java {
-    toolchain { languageVersion.set(JavaLanguageVersion.of(21)) }
+    toolchain { languageVersion.set(JavaLanguageVersion.of(25)) }
 }
 
 repositories { mavenCentral() }
@@ -119,7 +119,7 @@ tasks.named("shadowJar") { dependsOn(buildWeb) }
 tasks.named("nativeCompile") { dependsOn(buildWeb) }
 
 // ---------------------------------------------------------------------------
-// Native installers via the JDK 21 toolchain's `jpackage`.
+// Native installers via the JDK 25 toolchain's `jpackage`.
 //
 // `appImage` (cross-platform) builds a self-contained app directory that bundles
 // a stripped JRE. The three platform tasks (`jpackageDmg`, `jpackageMsi`,
@@ -133,9 +133,9 @@ val isMac = System.getProperty("os.name").startsWith("Mac OS X")
 val isWindows = System.getProperty("os.name").startsWith("Windows")
 val isLinux = System.getProperty("os.name").startsWith("Linux")
 
-// `jpackage` sits next to `java` inside the JDK 21 toolchain.
+// `jpackage` sits next to `java` inside the JDK 25 toolchain.
 val jpackageBin: java.io.File = javaToolchains
-    .launcherFor { languageVersion.set(JavaLanguageVersion.of(21)) }
+    .launcherFor { languageVersion.set(JavaLanguageVersion.of(25)) }
     .get()
     .executablePath
     .asFile

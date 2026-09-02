@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class FileStoreTest {
     Path dir;
     @BeforeEach void setUp() throws Exception { dir = Files.createTempDirectory("fs-"); }
-    @AfterEach void tearDown() throws Exception { if (Files.exists(dir)) Files.walk(dir).sorted((a, b) -> b.getNameCount() - a.getNameCount()).forEach(p -> { try { Files.deleteIfExists(p); } catch (Exception ignored) {} }); }
+    @AfterEach void tearDown() throws Exception { if (Files.exists(dir)) Files.walk(dir).sorted((a, b) -> b.getNameCount() - a.getNameCount()).forEach(p -> { try { Files.deleteIfExists(p); } catch (Exception _) {} }); }
 
     @Test void addEmitsBroadcastOnlyAfterHash() throws Exception {
         var store = new FileStore(dir);

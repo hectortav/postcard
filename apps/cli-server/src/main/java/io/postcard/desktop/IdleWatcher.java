@@ -49,10 +49,12 @@ public final class IdleWatcher {
         if (poll.isZero() || poll.isNegative()) throw new IllegalArgumentException("poll must be positive");
         if (grace.isNegative()) throw new IllegalArgumentException("grace must not be negative");
 
-        var thread = new Thread(() -> watch(clientCount, poll, grace, onIdle), "postcard-idle-watcher");
-        thread.setDaemon(true);
-        thread.start();
-        return thread;
+        // A virtual thread: this loop spends essentially all its life in sleep(), so
+        // pinning a platform thread to it would be pure waste. Virtual threads are
+        // always daemons, so it will not hold the JVM open.
+        return Thread.ofVirtual()
+            .name("postcard-idle-watcher")
+            .start(() -> watch(clientCount, poll, grace, onIdle));
     }
 
     private static void watch(IntSupplier clientCount, Duration poll, Duration grace, Runnable onIdle) {

@@ -16,7 +16,7 @@ public final class Shutdown {
         if (IN_FLIGHT.get() > 0) {
             // Drain budget exhausted; 1s upper bound on wait before forcing teardown.
             onTimeout.run();
-            try { Thread.sleep(1_000); } catch (InterruptedException ignored) {}
+            try { Thread.sleep(1_000); } catch (InterruptedException _) {}
         }
         afterDrain.run();
     }

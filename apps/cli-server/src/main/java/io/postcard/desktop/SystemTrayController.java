@@ -139,7 +139,7 @@ public final class SystemTrayController {
             try {
                 java.awt.EventQueue.invokeLater(() ->
                     icon.displayMessage("postcard", "Could not open browser: " + url, TrayIcon.MessageType.INFO));
-            } catch (Exception ignored) {
+            } catch (Exception _) {
                 // EventQueue not available (e.g. test env) — already logged above.
             }
         }
