@@ -20,6 +20,46 @@ importers:
 
   apps/cli-server: {}
 
+  apps/landing:
+    dependencies:
+      '@stylexjs/stylex':
+        specifier: ^0.7.5
+        version: 0.7.5
+      preact:
+        specifier: ^10.23.1
+        version: 10.29.8
+    devDependencies:
+      '@playwright/test':
+        specifier: ^1.45.3
+        version: 1.62.1
+      '@preact/preset-vite':
+        specifier: ^2.9.0
+        version: 2.10.6(@babel/core@7.29.7)(preact@10.29.8)(rollup@4.63.1)(vite@5.4.21(lightningcss@1.33.0))
+      '@sendme/config-eslint':
+        specifier: workspace:*
+        version: link:../../packages/config-eslint
+      '@sendme/config-typescript':
+        specifier: workspace:*
+        version: link:../../packages/config-typescript
+      '@stylexjs/unplugin':
+        specifier: ^0.17.0
+        version: 0.17.5(unplugin@2.3.11)
+      '@testing-library/preact':
+        specifier: ^3.2.4
+        version: 3.2.4(preact@10.29.8)
+      happy-dom:
+        specifier: ^14.12.3
+        version: 14.12.3
+      typescript:
+        specifier: ^5.5.4
+        version: 5.9.3
+      vite:
+        specifier: ^5.4.1
+        version: 5.4.21(lightningcss@1.33.0)
+      vitest:
+        specifier: ^1.6.0
+        version: 1.6.1(happy-dom@14.12.3)(lightningcss@1.33.0)
+
   apps/web:
     dependencies:
       '@noble/ciphers':

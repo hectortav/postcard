@@ -44,10 +44,10 @@ describe('fetchLatestRelease', () => {
     expect(r).not.toBeNull();
     expect(r?.tag).toBe('v0.1.0');
     expect(r?.assets).toHaveLength(3);
-    const byOs = Object.fromEntries(r!.assets.map((a) => [a.os, a]));
-    expect(byOs.mac.name).toBe('sendme-0.1.0.dmg');
-    expect(byOs.win.name).toBe('sendme-setup-0.1.0.exe');
-    expect(byOs.linux.name).toBe('sendme-0.1.0.AppImage');
+    const byOs = Object.fromEntries(r!.assets.map((a) => [a.os, a] as const));
+    expect(byOs.mac?.name).toBe('sendme-0.1.0.dmg');
+    expect(byOs.win?.name).toBe('sendme-setup-0.1.0.exe');
+    expect(byOs.linux?.name).toBe('sendme-0.1.0.AppImage');
   });
 
   it('throws on non-2xx responses other than 404', async () => {
