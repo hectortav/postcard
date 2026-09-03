@@ -5,7 +5,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public final class Shutdown {
     private static final AtomicInteger IN_FLIGHT = new AtomicInteger();
-    private static volatile Thread shutdownThread;
 
     public static void enter() { IN_FLIGHT.incrementAndGet(); }
     public static void leave() { IN_FLIGHT.decrementAndGet(); }
@@ -15,13 +14,11 @@ public final class Shutdown {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(budgetSeconds);
         while (IN_FLIGHT.get() > 0 && System.nanoTime() < deadline) { try { Thread.sleep(50); } catch (InterruptedException e) { Thread.currentThread().interrupt(); break; } }
         if (IN_FLIGHT.get() > 0) {
-            // Interrupt any still-running handler threads tracked by the runtime
-            if (shutdownThread != null) shutdownThread.interrupt();
+            // Drain budget exhausted; 1s upper bound on wait before forcing teardown.
             onTimeout.run();
             try { Thread.sleep(1_000); } catch (InterruptedException ignored) {}
         }
         afterDrain.run();
     }
-    public static void install(Thread t) { shutdownThread = t; }
     public static void run() { drain(3, () -> {}, () -> {}); }
 }

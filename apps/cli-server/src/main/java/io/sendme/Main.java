@@ -38,10 +38,8 @@ public final class Main {
                 // 1. stop accepting new connections
                 app.jettyServer().stop();
             } catch (Exception ignored) {}
-            // 2. drain in-flight handlers
-            Shutdown.drain(3, () -> {
-                // 3. interrupt + 1s join (Shutdown.drain does the join)
-            }, () -> {
+            // 2. drain in-flight handlers (3s budget) + 3. 1s upper bound on wait once budget is exhausted
+            Shutdown.drain(3, () -> {}, () -> {
                 // 4. close WebSocket hub
                 server.hub().close();
             });
