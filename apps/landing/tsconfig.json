@@ -1,0 +1,10 @@
+{
+  "extends": "@sendme/config-typescript/lib.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
+  "include": ["src/**/*", "tests/**/*"]
+}
