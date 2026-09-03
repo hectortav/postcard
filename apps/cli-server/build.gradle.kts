@@ -25,7 +25,6 @@ dependencies {
 
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.mockito.core)
-    testImplementation(libs.mockito.inline)
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
