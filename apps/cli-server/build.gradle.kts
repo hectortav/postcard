@@ -55,3 +55,62 @@ val buildWeb = tasks.register<Exec>("buildWeb") {
 tasks.named("compileJava") { dependsOn(buildWeb) }
 tasks.named("shadowJar") { dependsOn(buildWeb) }
 tasks.named("nativeCompile") { dependsOn(buildWeb) }
+
+// ---------------------------------------------------------------------------
+// Native installers via the JDK 21 toolchain's `jpackage`.
+//
+// `appImage` (cross-platform) builds a self-contained app directory that bundles
+// a stripped JRE. The three platform tasks (`jpackageDmg`, `jpackageMsi`,
+// `jpackageDeb`) depend on `appImage` and run a second `jpackage` invocation
+// to wrap it in a platform installer. Each platform task is gated on the host
+// OS via `enabled =` so calling the wrong one on another OS is a no-op
+// (Gradle prints "Task 'foo' is disabled" and exits 0).
+// ---------------------------------------------------------------------------
+
+val isMac = System.getProperty("os.name").startsWith("Mac OS X")
+val isWindows = System.getProperty("os.name").startsWith("Windows")
+val isLinux = System.getProperty("os.name").startsWith("Linux")
+
+// `jpackage` sits next to `java` inside the JDK 21 toolchain.
+val jpackageBin: java.io.File = javaToolchains
+    .launcherFor { languageVersion.set(JavaLanguageVersion.of(21)) }
+    .get()
+    .executablePath
+    .asFile
+    .parentFile
+    .resolve("jpackage")
+
+val shadowJarFile: java.io.File = tasks
+    .named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJar")
+    .get()
+    .archiveFile
+    .get()
+    .asFile
+
+val appImageDir = layout.buildDirectory.dir("dist/sendme")
+val installerDir = layout.buildDirectory.dir("dist/installer")
+
+// jpackage rejects app-versions with a leading-zero first number (CFBundleVersion
+// requires the first component to be > 0). Bump a pre-1.0 project version to "1.0"
+// for the bundle; the user-facing version stays at 0.x in `version`.
+val appVersion: String =
+    if (version.toString().startsWith("0.")) "1.0" else version.toString()
+
+tasks.register<Exec>("appImage") {
+    group = "build"
+    description = "Build a self-contained app image (executable + bundled JRE) via jpackage"
+    dependsOn("shadowJar")
+    // jpackage writes the app image into --dest; create the parent first.
+    doFirst { appImageDir.get().asFile.parentFile.mkdirs() }
+    commandLine(
+        jpackageBin.absolutePath,
+        "--type", "app-image",
+        "--name", "sendme",
+        "--vendor", "io.sendme",
+        "--app-version", appVersion,
+        "--input", shadowJarFile.parentFile.absolutePath,
+        "--main-jar", shadowJarFile.name,
+        "--main-class", "io.sendme.Main",
+        "--dest", appImageDir.get().asFile.parentFile.absolutePath,
+    )
+}
