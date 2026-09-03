@@ -4,6 +4,9 @@ Local file-sharing CLI + web UI. Drop files in the browser, share the printed UR
 let other devices on the LAN (or your hotspot) download — all in-process, no cloud,
 no accounts.
 
+The marketing site lives at [`apps/landing`](apps/landing) and is published to
+GitHub Pages at <https://index-zr0.github.io/sendme/>.
+
 ## Quick start
 
 ```bash
