@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Tests for {@link SystemTrayController}.
@@ -51,6 +52,12 @@ class SystemTrayControllerTest {
     }
 
     @Test void buildIconPopulatesMenuAndListeners() {
+        // Constructing a real java.awt.TrayIcon requires a display + a status-
+        // notifier host. On headless CI runners (and SSH sessions) this throws
+        // HeadlessException. Skip the test there; it still runs on a developer's
+        // macOS / Windows / Linux-with-status-notifier machine.
+        assumeTrue(SystemTray.isSupported(), "SystemTray not available in this environment");
+
         String url = "http://192.168.1.5:8080/";
         AtomicInteger quitCount = new AtomicInteger(0);
 
@@ -101,6 +108,10 @@ class SystemTrayControllerTest {
     }
 
     @Test void buildIconWorksWithNullQuitRunnable() {
+        // Same environment assumption as buildIconPopulatesMenuAndListeners: a
+        // real TrayIcon needs a display, so this test is skipped on headless CI.
+        assumeTrue(SystemTray.isSupported(), "SystemTray not available in this environment");
+
         // Defensive: callers can pass null for the quit hook (Main wires one
         // but tests / future use might not). The build itself must not NPE.
         TrayIcon icon = assertDoesNotThrow(() ->
