@@ -57,6 +57,22 @@ public final class Server {
     public String hotspotPassword() { return hotspotPassword; }
     public boolean tempDir() { return tempDir; }
     public WebSocketHub hub() { return hub; }
+
+    // Desktop notifications for peer activity. Injected by Main once the tray icon
+    // exists; a no-op sink until then, and forever in headless mode.
+    private volatile java.util.function.Consumer<io.postcard.desktop.Notifier.Event> notify =
+        io.postcard.desktop.Notifier.sink(_ -> {});
+    private volatile String hostIp = "";
+
+    public void setNotifier(java.util.function.Consumer<io.postcard.desktop.Notifier.Event> n, String hostIp) {
+        this.notify = n;
+        this.hostIp = hostIp == null ? "" : hostIp;
+    }
+
+    /** Announce peer activity; requests from the host itself are ignored. */
+    private void announce(String ip, java.util.function.Supplier<io.postcard.desktop.Notifier.Event> event) {
+        if (io.postcard.desktop.Notifier.isPeer(ip, hostIp)) notify.accept(event.get());
+    }
     public FileStore store() { return store; }
     public KeyMaterial keyMaterial() { return keyMaterial; }
     public PostcardOptions opts() { return opts; }
@@ -134,6 +150,7 @@ public final class Server {
                     }
                 }
                 String id = store.add(tmp, f.filename());
+                announce(ctx.ip(), () -> io.postcard.desktop.Notifier.uploaded(f.filename()));
                 ctx.json(java.util.Map.of("id", id));
             } finally { java.nio.file.Files.deleteIfExists(tmp); }
         });
@@ -149,6 +166,7 @@ public final class Server {
             var p = store.resolve(id);
             long size = entry.size();
             String filename = entry.name().replace("\"", "");
+            announce(ctx.ip(), () -> io.postcard.desktop.Notifier.downloaded(entry.name()));
             ctx.header("Content-Disposition", "attachment; filename=\"" + filename + "\"");
             String probed = java.nio.file.Files.probeContentType(p);
             ctx.header("Content-Type", probed != null ? probed : "application/octet-stream");

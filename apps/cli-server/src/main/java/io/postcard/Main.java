@@ -93,6 +93,10 @@ public final class Main {
                 io.postcard.desktop.SystemTrayController.install(url, quit);
             trayIcon.ifPresent(icon -> Runtime.getRuntime().addShutdownHook(new Thread(() ->
                 io.postcard.desktop.SystemTrayController.remove(icon), "postcard-tray-remove")));
+            // Announce peer uploads and downloads through the tray. The browser's
+            // Notification API is unavailable here: it requires a secure context and
+            // postcard serves over http on a LAN address.
+            server.setNotifier(io.postcard.desktop.Notifier.forTray(trayIcon), bind.getHostAddress());
         }
         // Closing the last dashboard makes postcard quit. Connected clients -- including a
         // phone that still has the page open -- keep it alive, which is the behaviour
