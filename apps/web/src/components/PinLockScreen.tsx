@@ -161,7 +161,7 @@ export function PinLockScreen({ pinLength, onVerified, verify }: Props) {
         <h2 id="pin-heading" className={stylex(styles.heading)}>
           Enter the {pinLength}-digit PIN shown on the other device
         </h2>
-        <p className={stylex(styles.sub)}>Shown once on the host's terminal</p>
+        <p className={stylex(styles.sub)}>Shown once on the host&apos;s terminal</p>
         <div className={stylex(styles.boxes)}>
           {digits.map((d, i) => (
             <input

@@ -24,7 +24,6 @@ export function Clipboard({ value, onChange }: { value: string; onChange: (t: st
         className={stylex(styles.area)}
         onInput={onInput}
         placeholder="Paste a link, a phone number, a line of code..."
-        spellcheck={true}
         autoComplete="off"
         autoCorrect="on"
         autoCapitalize="sentences"

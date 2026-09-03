@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'preact/hooks';
+import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
 import stylex from '@stylexjs/stylex';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useWakeLock } from './hooks/useWakeLock';
@@ -60,7 +60,7 @@ export function App() {
   const [clipboard, setClipboard] = useState<string>('');
   const [mode, setMode] = useState<SendmeMode>('lan');
   const [hotspot, setHotspot] = useState<{ ssid: string; password: string } | null>(null);
-  const [pinLength, setPinLength] = useState<number | null>(() => readPinLengthFromHash());
+  const pinLength = useMemo<number | null>(() => readPinLengthFromHash(), []);
   const [pinUnlocked, setPinUnlocked] = useState<boolean>(() => readPinLengthFromHash() === null);
 
   const { events, send } = useWebSocket(WS_URL());
