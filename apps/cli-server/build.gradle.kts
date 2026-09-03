@@ -87,7 +87,8 @@ val shadowJarFile: java.io.File = tasks
     .get()
     .asFile
 
-val appImageDir = layout.buildDirectory.dir("dist/sendme")
+val appImageDirName: String = if (isMac) "dist/sendme.app" else "dist/sendme"
+val appImageDir = layout.buildDirectory.dir(appImageDirName)
 val installerDir = layout.buildDirectory.dir("dist/installer")
 
 // jpackage rejects app-versions with a leading-zero first number (CFBundleVersion
@@ -100,8 +101,11 @@ tasks.register<Exec>("appImage") {
     group = "build"
     description = "Build a self-contained app image (executable + bundled JRE) via jpackage"
     dependsOn("shadowJar")
-    // jpackage writes the app image into --dest; create the parent first.
-    doFirst { appImageDir.get().asFile.parentFile.mkdirs() }
+    // jpackage refuses to overwrite an existing dest, so wipe it each run.
+    doFirst {
+        appImageDir.get().asFile.delete()
+        appImageDir.get().asFile.parentFile.mkdirs()
+    }
     commandLine(
         jpackageBin.absolutePath,
         "--type", "app-image",
@@ -112,5 +116,22 @@ tasks.register<Exec>("appImage") {
         "--main-jar", shadowJarFile.name,
         "--main-class", "io.sendme.Main",
         "--dest", appImageDir.get().asFile.parentFile.absolutePath,
+    )
+}
+
+tasks.register<Exec>("jpackageDmg") {
+    group = "build"
+    description = "Build a macOS .dmg installer (macOS only; disabled on other hosts)"
+    dependsOn("appImage")
+    enabled = isMac
+    doFirst { installerDir.get().asFile.mkdirs() }
+    commandLine(
+        jpackageBin.absolutePath,
+        "--type", "dmg",
+        "--name", "sendme",
+        "--vendor", "io.sendme",
+        "--app-version", appVersion,
+        "--app-image", appImageDir.get().asFile.absolutePath,
+        "--dest", installerDir.get().asFile.absolutePath,
     )
 }
