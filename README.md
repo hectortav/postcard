@@ -34,6 +34,7 @@ the page, copy the link.
 | `-d, --path` | temp dir | directory to share |
 | `-e, --encrypt` | off | AES-256-GCM, key in URL hash |
 | `--no-browser` | off | skip `Desktop.browse` |
+| `--headless` | off | daemon mode: no tray icon, no auto-browser |
 | `--max-upload <MiB>` | unbounded | pre-disk enforcement |
 | `--auth-token` | none | optional WS handshake secret |
 
