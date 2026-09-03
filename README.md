@@ -41,3 +41,36 @@ the page, copy the link.
 See [`docs/superpowers/specs/2026-09-03-sendme-design.md`](docs/superpowers/specs/2026-09-03-sendme-design.md)
 for the design spec and [`docs/superpowers/plans/2026-09-03-sendme-impl.md`](docs/superpowers/plans/2026-09-03-sendme-impl.md)
 for the implementation plan.
+
+## Building installers
+
+`apps/cli-server` exposes four `Exec` tasks that wrap the JDK 21 toolchain's
+`jpackage` to produce platform-native installers. The shadow JAR + bundled JRE
+are emitted first; the three platform tasks then wrap that into an installer.
+
+```bash
+cd apps/cli-server
+
+# Self-contained app image (works on any host).
+./gradlew appImage
+# -> build/dist/sendme.app/  (macOS)   build/dist/sendme/  (Linux / Windows)
+
+# Platform installers. Each is `enabled = false` on the wrong OS, so calling
+# jpackageMsi on a Mac just prints `Task :jpackageMsi SKIPPED` and exits 0.
+./gradlew jpackageDmg   # macOS  -> build/dist/installer/sendme-<appVersion>.dmg
+./gradlew jpackageMsi   # Win    -> build/dist/installer/sendme-<appVersion>.msi
+./gradlew jpackageDeb   # Linux  -> build/dist/installer/sendme_<appVersion>_amd64.deb
+```
+
+`<appVersion>` is `version` from `build.gradle.kts`, except when it starts with
+`0.` (pre-1.0) — `jpackage` rejects a leading-zero first number on the macOS
+bundler, so the task pins the bundle to `1.0` while the project version stays
+at `0.x` for marketing.
+
+Notes:
+- The `.dmg` / `.msi` are **unsigned**; first-launch Gatekeeper / SmartScreen
+  warnings are expected. Code signing is a v0.2+ concern.
+- The bundled JRE is the full JDK 21 runtime (~170 MB on disk before DMG
+  compression). A `jlink`-stripped runtime is a future enhancement.
+- Cross-platform CI builds (run each platform's task on its own runner) are
+  Phase 10.
