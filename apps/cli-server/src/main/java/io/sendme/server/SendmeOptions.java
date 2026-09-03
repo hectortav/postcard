@@ -2,10 +2,11 @@ package io.sendme.server;
 
 import picocli.CommandLine;
 import java.nio.file.Path;
+import java.util.concurrent.Callable;
 
 @CommandLine.Command(name = "sendme", mixinStandardHelpOptions = true, version = "sendme 0.1.0",
   description = "Local file-sharing CLI + web UI")
-public class SendmeOptions {
+public class SendmeOptions implements Callable<Integer> {
     @CommandLine.Option(names = {"-p", "--port"}, defaultValue = "8080", description = "Port to bind (default 8080; 'auto' → :0)")
     public String port = "8080";
 
@@ -26,4 +27,6 @@ public class SendmeOptions {
 
     @CommandLine.Option(names = "--auth-token", description = "Optional WS handshake secret")
     public String authToken;
+
+    @Override public Integer call() { return 0; }
 }
