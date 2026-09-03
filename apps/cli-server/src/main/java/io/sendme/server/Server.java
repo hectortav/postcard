@@ -5,6 +5,7 @@ import io.javalin.http.staticfiles.Location;
 import io.sendme.crypto.ChunkCipher;
 import io.sendme.crypto.KeyMaterial;
 import io.sendme.http.RangeParser;
+import io.sendme.util.Shutdown;
 import io.sendme.ws.WebSocketHub;
 import java.security.SecureRandom;
 import java.util.Base64;
@@ -66,6 +67,9 @@ public final class Server {
         // Global response headers
         app.before(ctx -> { ctx.header("X-Sendme-Mode", mode); ctx.header("Cache-Control", "no-store"); });
         app.after(ctx -> { if (ctx.path().startsWith("/api/")) ctx.header("Cache-Control", "no-store"); });
+        // In-flight tracking for graceful shutdown
+        app.before(ctx -> Shutdown.enter());
+        app.after(ctx -> Shutdown.leave());
 
         app.get("/api/files", ctx -> ctx.json(store.list()));
         app.post("/api/upload", ctx -> {

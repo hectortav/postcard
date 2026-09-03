@@ -5,6 +5,7 @@ import io.sendme.net.HotspotLauncher;
 import io.sendme.net.NetworkInterfaceSelector;
 import io.sendme.server.SendmeOptions;
 import io.sendme.server.Server;
+import io.sendme.util.Shutdown;
 import picocli.CommandLine;
 import java.net.Inet4Address;
 
@@ -31,7 +32,22 @@ public final class Main {
         if (opts.authToken != null) url += (url.contains("?") ? "&" : "?") + "token=" + opts.authToken;
         System.out.println("BIND " + url);
         if (!opts.noBrowser) java.awt.Desktop.getDesktop().browse(java.net.URI.create(url));
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> io.sendme.util.Shutdown.run()));
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            try {
+                // 1. stop accepting new connections
+                app.jettyServer().stop();
+            } catch (Exception ignored) {}
+            // 2. drain in-flight handlers
+            Shutdown.drain(3, () -> {
+                // 3. interrupt + 1s join (Shutdown.drain does the join)
+            }, () -> {
+                // 4. close WebSocket hub
+                server.hub().close();
+            });
+            // 5. delete temp dir + log goodbye
+            if (server.tempDir()) { try { java.nio.file.Files.walk(server.store().dir()).sorted((a, b) -> b.getNameCount() - a.getNameCount()).forEach(p -> { try { java.nio.file.Files.deleteIfExists(p); } catch (Exception ignored) {} }); } catch (Exception ignored) {} }
+            org.slf4j.LoggerFactory.getLogger(Main.class).info("sendme: goodbye");
+        }));
     }
     private static int parsePortOrZero(String p) { return p.equalsIgnoreCase("auto") ? 0 : Integer.parseInt(p); }
 }
