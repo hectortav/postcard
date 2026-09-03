@@ -1,0 +1,60 @@
+# Node / pnpm
+node_modules/
+.pnpm-store/
+.pnpm-debug.log*
+pnpm-debug.log*
+
+# Build outputs (TS / Vite / Turbo)
+dist/
+build/
+.turbo/
+.turbo-cache/
+*.tsbuildinfo
+
+# Gradle / Java
+.gradle/
+target/
+*.jar
+*.war
+hs_err_pid*
+replay_pid*
+
+# Vite build output for the Java resource bundle — generated, not committed
+apps/cli-server/src/main/resources/public/
+apps/cli-server/src/main/resources/public/**
+
+# GraalVM native-image build output
+apps/cli-server/build/
+apps/cli-server/.cxx/
+
+# IDE / editor
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Local env / secrets — never committed
+.env
+.env.local
+.env.*.local
+**/application-local.yml
+**/application-local.properties
+
+# Test / coverage
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+/blob-report/
+/playwright/.cache/
+
+# OS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+ehthumbs.db
+Desktop.ini
