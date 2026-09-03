@@ -9,6 +9,12 @@ picocli = "4.7.6"
 zxing = "3.5.3"
 slf4j = "2.0.13"
 logback = "1.5.6"
+# Jackson is optional in Javalin 6.3.0 (declared `<optional>true</optional>` in its
+# POM). Task 2.10's WS `onMessage` clipboard handler uses ObjectMapper.readValue to
+# parse the `{type:"clipboard", text:"..."}` frame, so we pull it in explicitly. Pin
+# matches Javalin's internal 2.13.5 to avoid the Kotlin / nullability drift between
+# 2.13.x and 2.14+/2.15+; 2.21 (which is in the local cache) is too new.
+jackson = "2.13.5"
 junit = "5.10.2"
 mockito = "5.12.0"
 # shadow 8.1.1 (in the brief) was not published; the 8.x line starts at 8.3.0.
@@ -25,6 +31,7 @@ zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
 zxing-javase = { module = "com.google.zxing:javase", version.ref = "zxing" }
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
+jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
 mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
 mockito-inline = { module = "org.mockito:mockito-inline", version.ref = "mockito" }

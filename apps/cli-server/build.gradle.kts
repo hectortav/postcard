@@ -21,6 +21,7 @@ dependencies {
     implementation(libs.zxing.core)
     implementation(libs.zxing.javase)
     implementation(libs.slf4j.api)
+    implementation(libs.jackson.databind)
     runtimeOnly(libs.logback.classic)
 
     testImplementation(libs.junit.jupiter)

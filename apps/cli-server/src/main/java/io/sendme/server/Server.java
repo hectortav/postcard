@@ -14,6 +14,7 @@ public final class Server {
     public static final java.util.concurrent.ExecutorService VIRTUAL = Executors.newVirtualThreadPerTaskExecutor();
     private final SendmeOptions opts;
     private final WebSocketHub hub = new WebSocketHub();
+    private final java.util.concurrent.ConcurrentHashMap<Object, io.sendme.ws.SendmeSession> sessionByJavalinSession = new java.util.concurrent.ConcurrentHashMap<>();
     private FileStore store;
     private KeyMaterial keyMaterial;
     private String mode = "lan";
@@ -49,6 +50,17 @@ public final class Server {
                 s.hostedPath = "/";
                 s.directory = "/public";
                 s.location = Location.CLASSPATH;
+            });
+            // WebSocket limits — see design §6.1 / Global Constraints.
+            // The brief's `app.jetty.modifyJetty(b -> b.setHandler(new HandlerList(...)))` is broken
+            // Kotlin-style code; in Javalin 6.3.0 (Jetty 11.0.23 transitive) the policy settings
+            // live on the JettyWebSocketServletFactory, which Javalin exposes via
+            // `cfg.jetty.modifyWebSocketServletFactory(...)`. The factory is itself a
+            // WebSocketPolicy, so the setters chain directly.
+            cfg.jetty.modifyWebSocketServletFactory(f -> {
+                f.setMaxTextMessageSize(65536L);    // 64 KiB text frames (spec §6.1)
+                f.setMaxBinaryMessageSize(0L);      // 0 → reject binary; we only send text
+                f.setIdleTimeout(java.time.Duration.ofSeconds(60));
             });
         });
         // Global response headers
@@ -122,6 +134,65 @@ public final class Server {
             try (var in = java.nio.file.Files.newInputStream(p)) { in.skipNBytes(r.start()); ctx.result(in.readNBytes((int) len)); }
         });
         app.get("/api/clipboard", ctx -> ctx.json(java.util.Map.of("text", getClipboard())));
+
+        // WebSocket route — see design §6.6, spec §6.1, brief Task 2.10.
+        // Per-Javalin-Session adapter map keyed by Object (the Javalin WsContext) is the
+        // identity-based remove the WebSocketHub verifier mandated. `onClose` looks up
+        // the adapter by the Javalin WsContext and removes it from the hub; a buggy client
+        // passing an anonymous SendmeSession can no longer evict a real one.
+        app.ws("/ws", ws -> {
+            ws.onConnect(ctx -> {
+                // Enforce --auth-token (design §6.7, plan §29, spec §2 #1).
+                if (opts.authToken != null) {
+                    String qs = ctx.queryString();
+                    String token = qs == null ? null : java.util.Arrays.stream(qs.split("&"))
+                        .filter(p -> p.startsWith("token=")).findFirst().map(p -> p.substring(6)).orElse(null);
+                    if (!opts.authToken.equals(token)) { ctx.closeSession(4401, "unauthorized"); return; }
+                }
+                var adapter = new io.sendme.ws.SendmeSession() {
+                    public void send(String json) { try { ctx.send(json); } catch (Exception e) { throw new RuntimeException(e); } }
+                    public void close(int code, String reason) { try { ctx.closeSession(code, reason); } catch (Exception ignored) {} }
+                };
+                sessionByJavalinSession.put(ctx, adapter);
+                hub.add(adapter);
+                // Initial snapshot (includes hotspot creds when in hotspot mode).
+                try {
+                    var sb = new StringBuilder("{\"type\":\"snapshot\",\"files\":[");
+                    var list = store.list();
+                    for (int i = 0; i < list.size(); i++) {
+                        var e = list.get(i);
+                        if (i > 0) sb.append(",");
+                        sb.append("{\"id\":\"").append(e.id()).append("\",\"name\":\"").append(json(e.name())).append("\",\"size\":").append(e.size()).append(",\"mtime\":").append(e.mtime()).append(",\"sha256\":\"").append(e.sha256()).append("\"}");
+                    }
+                    sb.append("],\"clipboard\":\"").append(json(getClipboard())).append("\"");
+                    if ("hotspot".equals(mode) && hotspotSsid != null) {
+                        sb.append(",\"hotspot\":{\"ssid\":\"").append(json(hotspotSsid)).append("\",\"password\":\"").append(json(hotspotPassword)).append("\"}");
+                    }
+                    sb.append("}");
+                    adapter.send(sb.toString());
+                } catch (Exception ignored) {
+                    // If snapshot build fails (e.g. disk read error), close the session.
+                    try { ctx.closeSession(1011, "internal error"); } catch (Exception ignored2) {}
+                }
+            });
+            ws.onMessage(ctx -> {
+                try {
+                    @SuppressWarnings("unchecked")
+                    var j = (java.util.Map<String, Object>) new com.fasterxml.jackson.databind.ObjectMapper().readValue(ctx.message(), java.util.Map.class);
+                    if ("clipboard".equals(j.get("type"))) {
+                        var t = String.valueOf(j.getOrDefault("text", ""));
+                        setClipboard(t);
+                        hub.broadcast("{\"type\":\"clipboard\",\"text\":\"" + json(t) + "\"}");
+                    }
+                } catch (Exception ignored) {
+                    // Malformed JSON: drop the frame, keep the session open.
+                }
+            });
+            ws.onClose(ctx -> {
+                var adapter = sessionByJavalinSession.remove(ctx);
+                if (adapter != null) hub.remove(adapter);
+            });
+        });
         return app;
     }
 
