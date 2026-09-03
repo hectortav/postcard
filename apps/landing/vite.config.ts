@@ -7,10 +7,11 @@ import { dirname } from 'node:path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Injects the StyleX-generated `stylex.css` into the built index.html.
-// The plugin writes the file at outDir/stylex.css (or assets/stylex.css
-// depending on `emptyOutDir` + the plugin's output config). The `assets/`
-// variant is what we see in this build; the `stylex.css` at root is the
-// fallback. We link whichever is present.
+// The StyleX unplugin writes the file at `assets/stylex.css` during
+// build, but does NOT inject a corresponding <link> in production
+// (`transformIndexHtml` is gated to `devMode === 'full'`). We do it
+// here, with a path that respects Vite's `base` (so GitHub Pages
+// hosting at `/sendme/` resolves the asset correctly).
 const injectStylexCss = (): import('vite').Plugin => ({
   name: 'sendme:inject-stylex-css',
   apply: 'build',
@@ -18,8 +19,11 @@ const injectStylexCss = (): import('vite').Plugin => ({
   transformIndexHtml: {
     order: 'post',
     handler(html) {
-      const link = '<link rel="stylesheet" href="/assets/stylex.css">';
-      if (html.includes('href="/assets/stylex.css"') || html.includes('href="/stylex.css"')) return html;
+      // We hardcode the prefix here because the `base` config is
+      // `/sendme/` (see the top of this file); if the base ever
+      // changes, update this string in lockstep.
+      const link = '<link rel="stylesheet" href="/sendme/assets/stylex.css">';
+      if (html.includes('href="/sendme/assets/stylex.css"') || html.includes('href="/sendme/stylex.css"')) return html;
       return html.replace('</head>', `  ${link}\n  </head>`);
     },
   },
