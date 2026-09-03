@@ -23,6 +23,9 @@ importers:
       '@stylexjs/eslint-plugin':
         specifier: ^0.7.0
         version: 0.7.5
+      '@stylexjs/shared':
+        specifier: ^0.7.0
+        version: 0.7.5
       '@typescript-eslint/eslint-plugin':
         specifier: ^8.3.0
         version: 8.69.0(@typescript-eslint/parser@8.69.0(eslint@9.39.5)(typescript@5.9.3))(eslint@9.39.5)(typescript@5.9.3)
@@ -106,6 +109,10 @@ packages:
 
   '@stylexjs/eslint-plugin@0.7.5':
     resolution: {integrity: sha512-FLKsjfmPbnXXFHcBuB0HwzwQRftlNejA+yzfBOE5fBjXZnzQZyKTJzMrI29c89FpyPr+jd4F0X1RUJrGNj2Jfg==}
+
+  '@stylexjs/shared@0.7.5':
+    resolution: {integrity: sha512-B357xldr9Dh3tP646P0JKNnarxy5ei4mkZh1qQmuhgGewbaVcrD8jiEWH3WjEzRrBKfmJtcTxBC3xp507u7O4A==}
+    deprecated: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
 
   '@turbo/darwin-64@2.10.12':
     resolution: {integrity: sha512-9nKgKoF6ZOUsM+or0OtNf+TTJSfGvDNP7ZFv/ZGWVwOSCkumyctQiTeHwB4UNljHTnC41AqylgbunLDHoccNrA==}
@@ -831,6 +838,9 @@ packages:
     resolution: {integrity: sha512-/+5VFTchJDoVj3bhoqi6UeymcD00DAwb1nJwamzPvHEszJ4FpF6SNNbUbOS8yI56qHzdV8eK0qEfOSiodkTdxg==}
     engines: {node: '>= 0.4'}
 
+  postcss-value-parser@4.2.0:
+    resolution: {integrity: sha512-1NNCs6uurfkVbeXG4S8JFT9t19m45ICnif8zWLd5oPSZ50QnwMfK+H3jv408d4jw/7Bttv5axS5IiHoLaVNHeQ==}
+
   prelude-ls@1.2.1:
     resolution: {integrity: sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==}
     engines: {node: '>= 0.8.0'}
@@ -1105,6 +1115,10 @@ snapshots:
   '@stylexjs/eslint-plugin@0.7.5':
     dependencies:
       micromatch: 4.0.8
+
+  '@stylexjs/shared@0.7.5':
+    dependencies:
+      postcss-value-parser: 4.2.0
 
   '@turbo/darwin-64@2.10.12':
     optional: true
@@ -2003,6 +2017,8 @@ snapshots:
   picomatch@4.0.7: {}
 
   possible-typed-array-names@1.1.0: {}
+
+  postcss-value-parser@4.2.0: {}
 
   prelude-ls@1.2.1: {}
 

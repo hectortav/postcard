@@ -16,6 +16,7 @@
     "eslint-plugin-react": "^7.35.0",
     "eslint-config-prettier": "^9.1.0",
     "@stylexjs/eslint-plugin": "^0.7.0",
+    "@stylexjs/shared": "^0.7.0",
     "globals": "^15.9.0"
   }
 }
