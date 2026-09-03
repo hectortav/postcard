@@ -103,7 +103,15 @@ graalvmNative {
 // (../../) so the workspace filter resolves correctly.
 val buildWeb = tasks.register<Exec>("buildWeb") {
     workingDir(file("../../"))
-    commandLine("pnpm", "--filter", "@sendme/web", "build")
+    // pnpm on Windows is pnpm.cmd, and the PATH changes from pnpm/action-setup
+    // don't always propagate to gradle's Exec task. Use the script the action
+    // guarantees: $PNPM_HOME/pnpm (or pnpm.cmd on Windows).
+    val pnpmBin = if (System.getProperty("os.name").startsWith("Windows")) {
+        "$System.env.PNPM_HOME\\pnpm.cmd"
+    } else {
+        "$System.env.PNPM_HOME/pnpm"
+    }
+    commandLine(pnpmBin, "--filter", "@sendme/web", "build")
 }
 tasks.named("compileJava") { dependsOn(buildWeb) }
 tasks.named("shadowJar") { dependsOn(buildWeb) }
