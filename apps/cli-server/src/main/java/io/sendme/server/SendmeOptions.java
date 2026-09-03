@@ -22,6 +22,9 @@ public class SendmeOptions implements Callable<Integer> {
     @CommandLine.Option(names = "--no-browser", description = "Do not auto-open the default browser on bind")
     public boolean noBrowser;
 
+    @CommandLine.Option(names = "--headless", description = "Run as a background daemon: no system tray, no auto-browser. Use for headless servers, NAS, or SSH sessions.")
+    public boolean headless;
+
     @CommandLine.Option(names = "--max-upload", description = "Optional upload-size cap in MiB")
     public Long maxUploadMiB;
 
