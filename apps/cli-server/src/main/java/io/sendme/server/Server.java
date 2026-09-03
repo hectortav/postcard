@@ -104,7 +104,13 @@ public final class Server {
         app.before(ctx -> Shutdown.enter());
         app.after(ctx -> Shutdown.leave());
 
-        app.get("/api/files", ctx -> ctx.json(store.list()));
+        app.get("/api/files", ctx -> {
+            if (pinRequired && derivedKey == null) {
+                ctx.status(401).json(java.util.Map.of("error", "pin_required"));
+                return;
+            }
+            ctx.json(store.list());
+        });
         app.post("/api/upload", ctx -> {
             long limit = opts.maxUploadMiB == null ? Long.MAX_VALUE : opts.maxUploadMiB * 1024L * 1024L;
             long contentLength = ctx.req().getContentLengthLong();
@@ -128,6 +134,10 @@ public final class Server {
             } finally { java.nio.file.Files.deleteIfExists(tmp); }
         });
         app.get("/api/download/{id}", ctx -> {
+            if (pinRequired && derivedKey == null) {
+                ctx.status(401).json(java.util.Map.of("error", "pin_required"));
+                return;
+            }
             var id = ctx.pathParam("id");
             if (!id.matches("^[A-Za-z0-9_-]{8,64}$")) { ctx.status(400); return; }
             var entry = store.findById(id);
