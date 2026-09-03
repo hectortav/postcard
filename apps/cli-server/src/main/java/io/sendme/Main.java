@@ -31,6 +31,7 @@ public final class Main {
         if (server.keyMaterial() != null) url += "#key=" + server.keyB64Url();
         if (opts.authToken != null) url += (url.contains("?") ? "&" : "?") + "token=" + opts.authToken;
         System.out.println("BIND " + url);
+        System.out.println(io.sendme.qr.QrRenderer.ansi(url));
         if (!opts.noBrowser) java.awt.Desktop.getDesktop().browse(java.net.URI.create(url));
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             try {
