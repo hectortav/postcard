@@ -7,7 +7,7 @@ export type FileEntry = {
 };
 
 export type ServerEvent =
-  | { type: 'snapshot'; files: FileEntry[]; clipboard: string }
+  | { type: 'snapshot'; files: FileEntry[]; clipboard: string; hotspot?: { ssid: string; password: string } }
   | { type: 'file_added'; id: string; name: string; size: number; mtime: number; sha256: string }
   | { type: 'file_removed'; id: string }
   | { type: 'clipboard'; text: string };
