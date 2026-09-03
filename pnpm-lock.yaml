@@ -18,6 +18,8 @@ importers:
         specifier: ^5.5.4
         version: 5.9.3
 
+  packages/config-typescript: {}
+
 packages:
 
   '@turbo/darwin-64@2.10.12':

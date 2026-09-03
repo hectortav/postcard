@@ -1,0 +1,7 @@
+{
+  "name": "@sendme/config-typescript",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "files": ["base.json", "lib.json", "node.json"]
+}
