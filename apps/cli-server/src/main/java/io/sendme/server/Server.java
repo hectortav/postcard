@@ -78,6 +78,7 @@ public final class Server {
             if (contentLength > limit) { ctx.status(413).json(java.util.Map.of("error", "upload_too_large", "limitBytes", limit)); return; }
             var f = ctx.uploadedFile("file");
             if (f == null) { ctx.status(400).json(java.util.Map.of("error", "missing_file")); return; }
+            if (f.filename() != null && f.filename().codePoints().anyMatch(cp -> cp < 0x20)) { ctx.status(400).json(java.util.Map.of("error", "invalid_filename")); return; }
             var tmp = java.nio.file.Files.createTempFile("up-", ".bin");
             try {
                 long written = 0;
