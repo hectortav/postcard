@@ -22,6 +22,10 @@ const sharedIgnores = [
   '**/playwright-report/**',
   '**/test-results/**',
   'apps/cli-server/src/main/resources/public/**',
+  // Vite writes these next to vite.config.ts while bundling the config and
+  // deletes them immediately; linting concurrently with a build would otherwise
+  // race and fail with ENOENT.
+  '**/*.timestamp-*.mjs',
 ];
 
 export default [

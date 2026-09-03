@@ -1,27 +1,39 @@
 /**
- * Browser-side WebCrypto wrapper for the PIN layer.
+ * Browser-side PIN key derivation.
  *
- * Mirrors {@code io.postcard.security.PinSecurityEngine} on the Java side:
- * both ends derive the same 256-bit AES key from
- * {@code PBKDF2-HMAC-SHA256(secretBytes, pin, salt)} with 200,000
- * iterations. The salt is {@code SHA-256(secretBytes)} (hex) so both
- * sides can compute it deterministically without any out-of-band exchange.
+ * Mirrors `io.postcard.security.PinSecurityEngine` on the Java side: both ends derive the
+ * same 256-bit AES key as `PBKDF2-HMAC-SHA256(pin, salt, 200_000)`, where the salt is
+ * `SHA-256(secretBytes)` in hex so both sides can compute it without any out-of-band
+ * exchange. The receiver's URL fragment carries the random 256-bit secret; the user types
+ * the 4-digit PIN shown on the host's terminal. Together they produce the AES key.
  *
- * The receiver's URL fragment contains the random 256-bit secret as hex.
- * The user types the 4-digit PIN shown on the host's terminal. Together
- * they produce the AES key that decrypts the file stream.
+ * Two properties are load-bearing and are pinned by tests:
  *
- * The exported {@link CryptoKey} has algorithm {@code AES-GCM} and usages
- * {@code ['encrypt', 'decrypt']} so the existing streaming-decrypt path
- * can consume it directly (see {@link ./lib/decrypt.ts}).
+ * 1. **The PIN is the PBKDF2 password.** The secret only reaches the derivation through
+ *    the salt. That is what makes knowing the URL insufficient to decrypt: an attacker
+ *    with the fragment has the salt but must still brute-force the PIN against 200k
+ *    iterations, which the server's per-IP rate limiter then throttles.
+ *
+ * 2. **No WebCrypto.** postcard serves from `http://<lan-ip>:<port>`, which is not a
+ *    secure context, so `crypto.subtle` is `undefined` on every device that ever loads
+ *    this page -- including the host. Hashing and PBKDF2 come from `@noble/hashes` and
+ *    AES-GCM from `@noble/ciphers`, exactly as `lib/decrypt.ts` already does.
+ *    (`crypto.getRandomValues` is *not* restricted to secure contexts and is still used
+ *    for IVs.)
+ *
+ * Keys are raw 32-byte `Uint8Array`s rather than `CryptoKey`s, which is what the
+ * streaming-decrypt path in `lib/decrypt.ts` consumes anyway.
  */
+import { sha256 } from '@noble/hashes/sha2';
+import { pbkdf2Async } from '@noble/hashes/pbkdf2';
+import { gcm } from '@noble/ciphers/aes';
 
 const PBKDF2_ITERATIONS = 200_000;
-const KEY_BITS = 256;
+const KEY_BYTES = 32;
 const IV_BYTES = 12;
 const HEX = '0123456789abcdef';
 
-function fromHex(s: string): Uint8Array<ArrayBuffer> {
+function fromHex(s: string): Uint8Array {
   const len = s.length;
   if (len % 2 !== 0) throw new Error('hex string must have even length');
   const out = new Uint8Array(len / 2);
@@ -31,7 +43,7 @@ function fromHex(s: string): Uint8Array<ArrayBuffer> {
     if (hi < 0 || lo < 0) throw new Error('non-hex character at ' + i);
     out[i / 2] = (hi << 4) | lo;
   }
-  return out as Uint8Array<ArrayBuffer>;
+  return out;
 }
 
 function toHex(bytes: Uint8Array): string {
@@ -44,87 +56,54 @@ function toHex(bytes: Uint8Array): string {
 }
 
 /**
- * Compute the deterministic salt for a given secret: {@code SHA-256(secretBytes)}
- * as lowercase hex. Both the Java sender and the browser receiver can call
- * this with the same {@code secretHex} and get the same result.
+ * The deterministic salt for a secret: `SHA-256(secretBytes)` as lowercase hex.
+ * Matches `PinSecurityEngine.saltFor`.
  */
 export async function saltFor(secretHex: string): Promise<string> {
-  const bytes = fromHex(secretHex);
-  const digest = await globalThis.crypto.subtle.digest('SHA-256', bytes);
-  return toHex(new Uint8Array(digest));
+  return toHex(sha256(fromHex(secretHex)));
 }
 
 /**
- * Derive the AES-256-GCM key from {@code (secretHex, pin, saltHex)}.
+ * Derive the AES-256-GCM key from `(secretHex, pin, saltHex)`.
  *
- * @param secretHex hex-encoded 32-byte random secret from the URL fragment
- * @param pin       4-digit PIN shown on the host's terminal
- * @param saltHex   hex-encoded SHA-256 of the secret (use {@link saltFor})
- * @returns an AES-GCM {@link CryptoKey} suitable for encrypt/decrypt
+ * @param secretHex hex-encoded 32-byte secret from the URL fragment; reaches the
+ *                  derivation only via `saltHex`, matching the Java side
+ * @param pin       the PIN shown on the host's terminal -- the PBKDF2 password
+ * @param saltHex   hex-encoded `SHA-256` of the secret (see {@link saltFor})
+ * @returns the raw 32-byte key
  */
 export async function deriveKey(
   secretHex: string,
   pin: string,
   saltHex: string,
-): Promise<CryptoKey> {
-  const secretBytes = fromHex(secretHex);
-  const saltBytes = fromHex(saltHex);
-  const baseKey = await globalThis.crypto.subtle.importKey(
-    'raw',
-    secretBytes,
-    { name: 'PBKDF2' },
-    false,
-    ['deriveBits'],
-  );
-  // PBKDF2_PARAMS shape: { name, hash, salt, iterations }. The `hash` is
-  // a named algorithm string per WebCrypto; 'SHA-256' selects the SHA-256
-  // digest for the HMAC.
-  const derivedBits = await globalThis.crypto.subtle.deriveBits(
-    { name: 'PBKDF2', hash: 'SHA-256', salt: saltBytes, iterations: PBKDF2_ITERATIONS },
-    baseKey,
-    KEY_BITS,
-  );
-  // Note: extractable is `true` here. In a production hardening pass the
-  // receiver would keep this key in a non-extractable CryptoKey held inside
-  // a SubtleCrypto-backed worker; the streaming-decrypt path would then wrap
-  // each chunk in a one-shot `decrypt` call. For the v0.1 receiver we export
-  // the raw bytes (as base64) to feed `@noble/ciphers` in the existing
-  // `lib/decrypt.ts` path, so extractability is required. Both code paths
-  // are equivalent on the wire.
-  return globalThis.crypto.subtle.importKey(
-    'raw',
-    derivedBits,
-    { name: 'AES-GCM' },
-    true,
-    ['encrypt', 'decrypt'],
-  );
+): Promise<Uint8Array> {
+  if (!secretHex) throw new Error('secret must not be empty');
+  if (!pin) throw new Error('pin must not be empty');
+  // Parsed for validation parity with the Java side, which rejects a malformed secret
+  // before deriving. The bytes themselves enter the derivation through the salt.
+  fromHex(secretHex);
+  return pbkdf2Async(sha256, new TextEncoder().encode(pin), fromHex(saltHex), {
+    c: PBKDF2_ITERATIONS,
+    dkLen: KEY_BYTES,
+  });
 }
 
 /** AES-GCM encrypt with a fresh 12-byte IV. Returns the IV and ciphertext. */
 export async function encrypt(
-  key: CryptoKey,
+  key: Uint8Array,
   plaintext: Uint8Array,
 ): Promise<{ iv: Uint8Array; ciphertext: Uint8Array }> {
   const iv = new Uint8Array(IV_BYTES);
+  // Not gated on a secure context, unlike crypto.subtle.
   globalThis.crypto.getRandomValues(iv);
-  const ciphertext = await globalThis.crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv: iv as Uint8Array<ArrayBuffer> },
-    key,
-    plaintext as Uint8Array<ArrayBuffer>,
-  );
-  return { iv, ciphertext: new Uint8Array(ciphertext) };
+  return { iv, ciphertext: gcm(key, iv).encrypt(plaintext) };
 }
 
 /** AES-GCM decrypt. Throws if the key/IV/ciphertext don't match (GCM auth tag). */
 export async function decrypt(
-  key: CryptoKey,
+  key: Uint8Array,
   iv: Uint8Array,
   ciphertext: Uint8Array,
 ): Promise<Uint8Array> {
-  const plaintext = await globalThis.crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: iv as Uint8Array<ArrayBuffer> },
-    key,
-    ciphertext as Uint8Array<ArrayBuffer>,
-  );
-  return new Uint8Array(plaintext);
+  return gcm(key, iv).decrypt(ciphertext);
 }

@@ -39,6 +39,10 @@ the page, copy the link.
 | `--max-upload <MiB>` | unbounded | pre-disk enforcement |
 | `--auth-token` | none | optional WS handshake secret |
 
+When a tray icon is available, postcard shows a desktop notification whenever
+*another* device uploads a file or downloads one of yours. Your own uploads and
+downloads stay silent, and `--headless` disables notifications entirely.
+
 See [`docs/superpowers/specs/2026-09-03-postcard-design.md`](docs/superpowers/specs/2026-09-03-postcard-design.md)
 for the design spec and [`docs/superpowers/plans/2026-09-03-postcard-impl.md`](docs/superpowers/plans/2026-09-03-postcard-impl.md)
 for the implementation plan.
@@ -91,6 +95,15 @@ should go live alongside the installers.
   knowing the URL alone is insufficient to decrypt the file stream.
 - **Rate limit**: per-IP, 3 wrong PINs → 15-minute lockout (returns 429 with
   `lockoutMsRemaining` so the UI can show a countdown).
+- **No WebCrypto, by necessity**: postcard serves from `http://<lan-ip>:<port>`,
+  which browsers do not treat as a secure context, so `crypto.subtle` is
+  `undefined` on every device that loads the page — including the host. All
+  hashing, PBKDF2 and AES-GCM in the browser therefore come from `@noble/*`,
+  never from SubtleCrypto. `apps/web/src/security/pin.test.ts` pins this with a
+  test that runs the derivation with `crypto.subtle` removed, and with vectors
+  generated from the Java side so the two implementations cannot drift apart.
+  (Desktop notifications hit the same wall, which is why they are delivered
+  through the tray icon rather than the Notification API.)
 - **Coverage gate**: new `io.postcard.security.*` code is held to 100% line +
   branch coverage by the `coverage` CI job; the rest of the repo is held
   to 90% (JaCoCo + Vitest thresholds).
