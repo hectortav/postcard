@@ -11,11 +11,6 @@
         "target/**"
       ]
     },
-    "lint": {
-      "dependsOn": [
-        "^build"
-      ]
-    },
     "typecheck": {
       "dependsOn": [
         "^build"

@@ -23,7 +23,7 @@ jobs:
           distribution: temurin
           java-version: 25
       - run: pnpm install --frozen-lockfile
-      - run: pnpm turbo run lint
+      - run: pnpm lint
 
   typecheck:
     runs-on: ${{ matrix.os }}

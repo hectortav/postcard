@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { decryptChunk } from './decrypt';
-import { gcm } from '@noble/ciphers/aes';
+import { gcm } from '@noble/ciphers/aes.js';
 
 const KEY = new Uint8Array(32).fill(0x42);
 const KEY_B64 = btoa(String.fromCharCode(...KEY));

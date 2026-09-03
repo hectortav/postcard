@@ -40,7 +40,7 @@ type Props = {
  * countdown and disable the inputs until it expires.
  */
 export function PinLockScreen({ pinLength, onVerified, verify }: Props) {
-  const [digits, setDigits] = useState<string[]>(() => new Array(pinLength).fill(''));
+  const [digits, setDigits] = useState<string[]>(() => Array.from({ length: pinLength }, () => ''));
   const [shake, setShake] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -1,10 +1,6 @@
 import { defineConfig } from 'vite';
 import preact from '@preact/preset-vite';
 import stylexPlugin from '@stylexjs/unplugin';
-import { fileURLToPath } from 'node:url';
-import { dirname } from 'node:path';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Injects the StyleX-generated `stylex.css` into the built index.html.
 // The StyleX unplugin writes the file at `assets/stylex.css` during
@@ -37,7 +33,7 @@ export default defineConfig({
   base: '/postcard/',
   plugins: [
     preact(),
-    stylexPlugin.vite({ unstable_moduleResolution: { type: 'commonJS', rootDir: __dirname } }),
+    stylexPlugin.vite({ unstable_moduleResolution: { type: 'commonJS', rootDir: import.meta.dirname } }),
     injectStylexCss(),
   ],
   build: {

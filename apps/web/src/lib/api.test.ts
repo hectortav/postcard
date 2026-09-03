@@ -43,7 +43,15 @@ describe('api', () => {
       status: 200,
       responseText: '{"id":"abc"}',
     };
-    const ctor = vi.fn().mockReturnValue(xhr);
+    // vitest 5 refuses `mockReturnValue` for anything invoked with `new`; a
+    // constructor mock has to be a real class that yields the stub instance.
+    // vitest 5 requires a real class here: a plain function is not `new`-able as a mock.
+    // oxlint-disable-next-line typescript/no-extraneous-class
+    const ctor = vi.fn(class {
+      constructor() {
+        return xhr as unknown as XMLHttpRequest;
+      }
+    });
     (globalThis as unknown as { XMLHttpRequest: typeof ctor }).XMLHttpRequest = ctor;
     const p = uploadFile(new File(['x'], 'a.txt'));
     xhr.onload?.();

@@ -24,9 +24,9 @@
  * Keys are raw 32-byte `Uint8Array`s rather than `CryptoKey`s, which is what the
  * streaming-decrypt path in `lib/decrypt.ts` consumes anyway.
  */
-import { sha256 } from '@noble/hashes/sha2';
-import { pbkdf2Async } from '@noble/hashes/pbkdf2';
-import { gcm } from '@noble/ciphers/aes';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { pbkdf2Async } from '@noble/hashes/pbkdf2.js';
+import { gcm } from '@noble/ciphers/aes.js';
 
 const PBKDF2_ITERATIONS = 200_000;
 const KEY_BYTES = 32;

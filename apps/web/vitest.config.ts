@@ -3,7 +3,7 @@ import preact from '@preact/preset-vite';
 import stylexPlugin from '@stylexjs/unplugin';
 
 export default defineConfig({
-  plugins: [preact(), stylexPlugin.vite({ unstable_moduleResolution: { type: 'commonJS', rootDir: __dirname } })],
+  plugins: [preact(), stylexPlugin.vite({ unstable_moduleResolution: { type: 'commonJS', rootDir: import.meta.dirname } })],
   test: {
     environment: 'happy-dom',
     globals: false,
