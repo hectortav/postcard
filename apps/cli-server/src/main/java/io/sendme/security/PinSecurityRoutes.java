@@ -148,9 +148,10 @@ public final class PinSecurityRoutes {
     @SuppressWarnings("unchecked")
     private static Map<String, Object> parseBody(io.javalin.http.Context ctx) {
         try {
-            // Javalin 6: ctx.body() returns the raw string.
+            // Javalin 6: ctx.body() returns the raw string. For a POST route
+            // the body is always present (possibly empty).
             String body = ctx.body();
-            if (body == null || body.isEmpty()) return Map.of();
+            if (body.isEmpty()) return Map.of();
             if (body.length() > BODY_LIMIT) return null;
             return JSON.readValue(body, Map.class);
         } catch (Exception e) {

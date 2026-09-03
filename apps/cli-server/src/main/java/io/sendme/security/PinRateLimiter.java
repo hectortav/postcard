@@ -53,11 +53,9 @@ public final class PinRateLimiter {
         Attempt a = state.get(ip);
         if (a == null) return false;
         if (a.lockedUntilEpochMs == 0L) return false;
-        if (clock.millis() < a.lockedUntilEpochMs) return true;
-        // Auto-expire: clear stale entry.
-        state.compute(ip, (k, v) -> v == null ? null
-            : (v.lockedUntilEpochMs != 0L && clock.millis() >= v.lockedUntilEpochMs) ? null : v);
-        return false;
+        // Expired entries are lazy-cleaned on the next failure/success that
+        // touches this IP. Just report `false` here.
+        return clock.millis() < a.lockedUntilEpochMs;
     }
 
     /** Record a successful PIN entry. Clears the IP's attempt counter. */

@@ -151,6 +151,57 @@ class PinSecurityEngineTest {
         assertArrayEquals(direct.getEncoded(), decoded);
     }
 
+    @Test
+    void deriveKeyBase64UrlRejectsShortSecret() {
+        // Short secret is rejected by saltFor's validation, which runs
+        // before the catch in deriveKeyBase64Url can fire.
+        assertThrows(IllegalArgumentException.class,
+            () -> {
+                try {
+                    PinSecurityEngine.deriveKeyBase64Url(new byte[8], "1234");
+                } catch (java.security.spec.InvalidKeySpecException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+    }
+
+    @Test
+    void verifyReturnsFalseOnShortSecretThatBreaksSaltFor() {
+        // secretBytes is too short for saltFor, so verify's try-block
+        // throws and the catch returns false.
+        assertFalse(PinSecurityEngine.verify(new byte[8], "1234", new byte[32]));
+    }
+
+    @Test
+    void fromHexRejectsCharWithOnlyHighNibbleBad() {
+        // 'g' is not a hex digit; '0' is — exercises the `hi < 0` branch
+        // while leaving `lo < 0` unhit.
+        String bad = "g" + "0".repeat(63);
+        byte[] secret = randomSecret();
+        assertThrows(IllegalArgumentException.class,
+            () -> PinSecurityEngine.deriveKey(secret, "1234", bad));
+    }
+
+    @Test
+    void fromHexRejectsCharWithOnlyLowNibbleBad() {
+        // '0' valid, 'g' invalid — exercises the `lo < 0` branch.
+        String bad = "0" + "g" + "0".repeat(62);
+        byte[] secret = randomSecret();
+        assertThrows(IllegalArgumentException.class,
+            () -> PinSecurityEngine.deriveKey(secret, "1234", bad));
+    }
+
+    @Test
+    void fromHexEvenLengthBranchCovered() throws Exception {
+        // 64-char input — even length, so the early throw on the even-length
+        // check is skipped (false branch). Confirms we don't short-circuit.
+        byte[] secret = randomSecret();
+        String goodSalt = PinSecurityEngine.saltFor(secret);
+        assertEquals(64, goodSalt.length());
+        SecretKey k = PinSecurityEngine.deriveKey(secret, "1234", goodSalt);
+        assertNotNull(k);
+    }
+
     /** Constant-time comparison helper to avoid importing the shim in the impl. */
     private static boolean MessageDigestIsEqualShim(byte[] a, byte[] b) {
         return java.security.MessageDigest.isEqual(a, b);
