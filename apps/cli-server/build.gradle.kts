@@ -104,14 +104,15 @@ graalvmNative {
 val buildWeb = tasks.register<Exec>("buildWeb") {
     workingDir(file("../../"))
     // pnpm on Windows is pnpm.cmd, and the PATH changes from pnpm/action-setup
-    // don't always propagate to gradle's Exec task. Use the script the action
-    // guarantees: $PNPM_HOME/pnpm (or pnpm.cmd on Windows).
-    val pnpmBin = if (System.getProperty("os.name").startsWith("Windows")) {
-        "$System.env.PNPM_HOME\\pnpm.cmd"
-    } else {
-        "$System.env.PNPM_HOME/pnpm"
+    // don't always propagate to gradle's Exec task. Prepend $PNPM_HOME to the
+    // PATH so the right pnpm is found on every runner.
+    val pnpmHome = System.getenv("PNPM_HOME")
+    if (pnpmHome != null) {
+        val sep = System.getProperty("path.separator") ?: ":"
+        environment("PATH", "${pnpmHome}${sep}${System.getenv("PATH")}")
     }
-    commandLine(pnpmBin, "--filter", "@sendme/web", "build")
+    val pnpmCmd = if (System.getProperty("os.name").startsWith("Windows")) "pnpm.cmd" else "pnpm"
+    commandLine(pnpmCmd, "--filter", "@sendme/web", "build")
 }
 tasks.named("compileJava") { dependsOn(buildWeb) }
 tasks.named("shadowJar") { dependsOn(buildWeb) }
