@@ -75,11 +75,17 @@ export function ComparisonTable() {
       {layout === 'grid' ? (
         <div className={stylex(styles.grid)} role="table" aria-label="sendme vs competitors">
           <div className={stylex(styles.headerRow)} role="row">
+            <div
+              className={stylex(styles.headerCell, styles.headerCorner)}
+              role="columnheader"
+              aria-hidden="true"
+            />
             {COLUMNS.map((col) => (
               <div
                 key={col.name}
-                className={stylex(styles.headerCell, col.emphasis && styles.headerCellEmphasised)}
+                className={stylex(styles.headerCell)}
                 role="columnheader"
+                style={col.emphasis ? { borderTop: '1px solid #A8332A' } : undefined}
               >
                 {col.emphasis && (
                   <span className={stylex(styles.youAreHere)}>← you are here</span>
@@ -96,8 +102,9 @@ export function ComparisonTable() {
               {row.values.map((value, idx) => (
                 <div
                   key={idx}
-                  className={stylex(styles.cell, COLUMNS[idx]?.emphasis && styles.cellEmphasised)}
+                  className={stylex(styles.cell)}
                   role="cell"
+                  style={COLUMNS[idx]?.emphasis ? { borderTop: '1px solid #A8332A' } : undefined}
                 >
                   {value}
                 </div>
@@ -114,10 +121,8 @@ export function ComparisonTable() {
                 {row.values.map((value, idx) => (
                   <div
                     key={idx}
-                    className={stylex(
-                      styles.stackItem,
-                      COLUMNS[idx]?.emphasis && styles.cellEmphasised,
-                    )}
+                    className={stylex(styles.stackItem)}
+                    style={COLUMNS[idx]?.emphasis ? { borderTop: '1px solid #A8332A' } : undefined}
                   >
                     <dt className={stylex(styles.stackTerm)}>{COLUMNS[idx]?.name}</dt>
                     <dd className={stylex(styles.stackValue)}>{value}</dd>
@@ -161,7 +166,7 @@ const styles = stylex.create({
   // Desktop (>= 720px) grid layout
   grid: {
     display: 'grid',
-    gridTemplateColumns: '1.4fr repeat(3, minmax(0, 1fr))',
+    gridTemplateColumns: 'minmax(0, 1.4fr) repeat(4, minmax(0, 1fr))',
     border: '1px solid #D8CDB7',
     borderRadius: '4px',
     overflow: 'hidden',
@@ -178,8 +183,8 @@ const styles = stylex.create({
     backgroundColor: '#E9E1D0',
     borderBottom: '1px solid #D8CDB7',
   },
-  headerCellEmphasised: {
-    borderTop: '1px solid #A8332A',
+  headerCorner: {
+    backgroundColor: '#E9E1D0',
   },
   youAreHere: {
     fontFamily: '"Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif',
@@ -231,9 +236,6 @@ const styles = stylex.create({
     ':last-child': {
       borderBottom: 'none',
     },
-  },
-  cellEmphasised: {
-    borderTop: '1px solid #A8332A',
   },
   // Mobile (< 720px) stacked cards
   stack: {
