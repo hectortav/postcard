@@ -86,7 +86,13 @@ public final class SystemTrayController {
         }
     }
 
-    private static TrayIcon buildIcon(String url, Runnable onQuit) {
+    /**
+     * Build a {@link TrayIcon} with the standard sendme menu (Open Dashboard, Copy
+     * Local URL, Quit). Package-private for unit tests; production callers should
+     * use {@link #install(String, Runnable)} which wraps this in a
+     * {@link SystemTray#add(TrayIcon)} call.
+     */
+    static TrayIcon buildIcon(String url, Runnable onQuit) {
         Image image = TrayIconFactory.create(64);
         TrayIcon icon = new TrayIcon(image, "sendme — " + url);
         icon.setToolTip("sendme — " + url);
