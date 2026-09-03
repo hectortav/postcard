@@ -103,7 +103,7 @@ tasks.register<Exec>("appImage") {
     dependsOn("shadowJar")
     // jpackage refuses to overwrite an existing dest, so wipe it each run.
     doFirst {
-        appImageDir.get().asFile.delete()
+        appImageDir.get().asFile.deleteRecursively()
         appImageDir.get().asFile.parentFile.mkdirs()
     }
     commandLine(
@@ -133,5 +133,24 @@ tasks.register<Exec>("jpackageDmg") {
         "--app-version", appVersion,
         "--app-image", appImageDir.get().asFile.absolutePath,
         "--dest", installerDir.get().asFile.absolutePath,
+    )
+}
+
+tasks.register<Exec>("jpackageMsi") {
+    group = "build"
+    description = "Build a Windows .msi installer (Windows only; disabled on other hosts)"
+    dependsOn("appImage")
+    enabled = isWindows
+    doFirst { installerDir.get().asFile.mkdirs() }
+    commandLine(
+        jpackageBin.absolutePath,
+        "--type", "msi",
+        "--name", "sendme",
+        "--vendor", "io.sendme",
+        "--app-version", appVersion,
+        "--app-image", appImageDir.get().asFile.absolutePath,
+        "--dest", installerDir.get().asFile.absolutePath,
+        "--win-menu",
+        "--win-shortcut",
     )
 }
