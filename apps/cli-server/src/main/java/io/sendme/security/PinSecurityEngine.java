@@ -87,12 +87,11 @@ public final class PinSecurityEngine {
      * Round-trip helper used by the verify route: re-derive the key from
      * {@code (secretBytes, pin)} and compare against {@code expectedDerived}
      * in constant time. {@code expectedDerived} is the raw 32-byte derived key,
-     * not the AES SecretKey wrapper.
+     * not the AES SecretKey wrapper. Any null/short/malformed input resolves
+     * to {@code false}; the route layer treats this as a 401.
      */
     public static boolean verify(byte[] secretBytes, String pin, byte[] expectedDerived) {
-        Objects.requireNonNull(secretBytes, "secretBytes");
-        Objects.requireNonNull(pin, "pin");
-        Objects.requireNonNull(expectedDerived, "expectedDerived");
+        if (secretBytes == null || pin == null || expectedDerived == null) return false;
         if (expectedDerived.length != KEY_BYTES) return false;
         try {
             String salt = saltFor(secretBytes);
@@ -132,11 +131,11 @@ public final class PinSecurityEngine {
     }
 
     private static String toHex(byte[] bytes) {
-        char[] out = new char[bytes.length * 2];
+        byte[] out = new byte[bytes.length * 2];
         for (int i = 0; i < bytes.length; i++) {
             int b = bytes[i] & 0xFF;
-            out[i * 2] = HEX[b >>> 4];
-            out[i * 2 + 1] = HEX[b & 0x0F];
+            out[i * 2] = (byte) HEX[b >>> 4];
+            out[i * 2 + 1] = (byte) HEX[b & 0x0F];
         }
         return new String(out, StandardCharsets.US_ASCII);
     }

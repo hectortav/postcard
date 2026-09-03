@@ -67,18 +67,25 @@ public final class PinRateLimiter {
 
     /**
      * Record a failed PIN entry. Increments the failure count and, when
-     * {@link #MAX_FAILS} is reached, arms the 15-minute lockout. The returned
-     * {@link Result} describes the new state.
+     * {@link #MAX_FAILS} is reached, arms the 15-minute lockout. Once a
+     * lockout is armed, additional failures during the window do not extend
+     * the timer — they only report the current {@code lockoutMsRemaining}.
+     * The returned {@link Result} describes the new state.
      */
     public Result recordFailure(String ip) {
         long now = clock.millis();
-        long lockEnd = now + LOCKOUT.toMillis();
         Result[] out = new Result[1];
         state.compute(ip, (k, prev) -> {
             Attempt a = (prev == null) ? new Attempt(0, 0L) : prev;
+            // If already locked and lockout still in effect, don't extend.
+            if (a.lockedUntilEpochMs != 0L && now < a.lockedUntilEpochMs) {
+                long ms = a.lockedUntilEpochMs - now;
+                out[0] = new Result(false, 0, ms);
+                return a;
+            }
             a.fails = a.fails + 1;
             if (a.fails >= MAX_FAILS) {
-                a.lockedUntilEpochMs = lockEnd;
+                a.lockedUntilEpochMs = now + LOCKOUT.toMillis();
                 int remaining = Math.max(0, MAX_FAILS - a.fails);
                 long ms = Math.max(0L, a.lockedUntilEpochMs - now);
                 out[0] = new Result(false, remaining, ms);
@@ -92,4 +99,31 @@ public final class PinRateLimiter {
 
     /** Test-only: clear all state. Not part of the public HTTP contract. */
     public void reset() { state.clear(); }
+
+    /**
+     * Read-only peek: how many more failures this IP can sustain before
+     * being locked. Returns {@link #MAX_FAILS} for IPs with no recorded
+     * attempts and {@code 0} for IPs that are currently locked or already
+     * exhausted.
+     */
+    public int peekRemaining(String ip) {
+        Attempt a = state.get(ip);
+        if (a == null) return MAX_FAILS;
+        if (a.lockedUntilEpochMs != 0L && clock.millis() < a.lockedUntilEpochMs) return 0;
+        if (a.fails >= MAX_FAILS) return 0;
+        return Math.max(0, MAX_FAILS - a.fails);
+    }
+
+    /**
+     * Read-only peek: the millis remaining on the IP's current lockout, or
+     * {@code 0} if the IP is not locked.
+     */
+    public long peekLockoutMsRemaining(String ip) {
+        Attempt a = state.get(ip);
+        if (a == null) return 0L;
+        if (a.lockedUntilEpochMs == 0L) return 0L;
+        long now = clock.millis();
+        if (now >= a.lockedUntilEpochMs) return 0L;
+        return a.lockedUntilEpochMs - now;
+    }
 }

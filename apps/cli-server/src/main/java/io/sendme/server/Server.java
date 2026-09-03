@@ -16,12 +16,24 @@ public final class Server {
     private final SendmeOptions opts;
     private final WebSocketHub hub = new WebSocketHub();
     private final java.util.concurrent.ConcurrentHashMap<Object, io.sendme.ws.SendmeSession> sessionByJavalinSession = new java.util.concurrent.ConcurrentHashMap<>();
+    private final io.sendme.security.PinRateLimiter pinLimiter = new io.sendme.security.PinRateLimiter();
     private FileStore store;
     private KeyMaterial keyMaterial;
     private String mode = "lan";
     private boolean tempDir;
     private String hotspotSsid;
     private String hotspotPassword;
+    // PIN-derived AES key. Set by /api/pin/verify when the receiver proves
+    // knowledge of the PIN. Until set, /api/files and /api/download refuse
+    // requests with 401 when --pin was supplied at startup.
+    private volatile byte[] derivedKey;
+    // Pre-derived key the sender produced at startup (when --pin is set).
+    // Used by the /api/pin/verify route to compare against the receiver's
+    // attempt without ever storing the PIN server-side.
+    private volatile byte[] expectedDerivedKey;
+    // True when the CLI was launched with --pin. Gates /api/files and
+    // /api/download/{id} until derivedKey is set.
+    private volatile boolean pinRequired;
 
     public Server(SendmeOptions opts) { this.opts = opts; }
 
@@ -44,6 +56,27 @@ public final class Server {
     public FileStore store() { return store; }
     public KeyMaterial keyMaterial() { return keyMaterial; }
     public SendmeOptions opts() { return opts; }
+
+    /** Raw bytes of the random 256-bit secret used as the KDF input. May be null when encryption is off. */
+    public byte[] secretBytes() { return keyMaterial == null ? null : keyMaterial.key(); }
+
+    /** Sender-pre-derived key (set when --pin is supplied at startup). */
+    public byte[] expectedDerivedKey() { return expectedDerivedKey; }
+    public void setExpectedDerivedKey(byte[] k) { this.expectedDerivedKey = k; }
+
+    /** True when the CLI was launched with --pin. */
+    public boolean pinRequired() { return pinRequired; }
+    public void setPinRequired(boolean v) { this.pinRequired = v; }
+
+    /** Derived AES key the receiver proved control of. Null until /api/pin/verify succeeds. */
+    public byte[] derivedKey() { return derivedKey; }
+    public void setDerivedKey(byte[] k) { this.derivedKey = k; }
+
+    /** Atomically swap the AES key the download route uses. */
+    public void replaceKeyMaterial(KeyMaterial km) { this.keyMaterial = km; }
+
+    /** Per-IP PIN rate limiter. */
+    public io.sendme.security.PinRateLimiter pinLimiter() { return pinLimiter; }
 
     public Javalin build() {
         var app = Javalin.create(cfg -> {
@@ -139,6 +172,13 @@ public final class Server {
             try (var in = java.nio.file.Files.newInputStream(p)) { in.skipNBytes(r.start()); ctx.result(in.readNBytes((int) len)); }
         });
         app.get("/api/clipboard", ctx -> ctx.json(java.util.Map.of("text", getClipboard())));
+
+        // PIN security routes. Always registered so the frontend can poll
+        // /api/pin/status; the actual gating happens inside the handler.
+        io.sendme.security.PinSecurityRoutes.register(
+            app,
+            pinLimiter,
+            this);
 
         // WebSocket route — see design §6.6, spec §6.1, brief Task 2.10.
         // Per-Javalin-Session adapter map keyed by Object (the Javalin WsContext) is the
