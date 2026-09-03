@@ -1,6 +1,7 @@
 import stylex from '@stylexjs/stylex';
 import { Hero } from './components/Hero';
 import { Features } from './components/Features';
+import { ComparisonTable } from './components/ComparisonTable';
 import { Terminal } from './components/Terminal';
 import { Download } from './components/Download';
 import { Footer } from './components/Footer';
@@ -11,6 +12,7 @@ export function App() {
       <Hero />
       <main className={stylex(styles.main)}>
         <Features />
+        <ComparisonTable />
         <Terminal />
         <Download />
       </main>

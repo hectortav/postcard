@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/preact';
+import { render, screen, waitFor, within } from '@testing-library/preact';
 import { App } from './App';
 
 describe('App', () => {
@@ -25,10 +25,15 @@ describe('App', () => {
     render(<App />);
     // Hero
     expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/send a file across the room/);
-    // Features
-    expect(screen.getByText('Local-first')).toBeTruthy();
-    expect(screen.getByText('Encrypted')).toBeTruthy();
-    expect(screen.getByText('Cross-platform')).toBeTruthy();
+    // Features (scope to the features section because "Cross-platform" also
+    // appears in the comparison table's Platform Compatibility row).
+    const featuresSection = document.querySelector('section[aria-labelledby="features-heading"]') as HTMLElement;
+    expect(within(featuresSection).getByText('Local-first')).toBeTruthy();
+    expect(within(featuresSection).getByText('Encrypted')).toBeTruthy();
+    expect(within(featuresSection).getByText('Cross-platform')).toBeTruthy();
+    // Comparison table now lives between Features and Terminal.
+    const comparisonSection = document.querySelector('section[aria-labelledby="comparison-heading"]') as HTMLElement;
+    expect(within(comparisonSection).getByText('How it compares')).toBeTruthy();
     // Terminal
     expect(screen.getByText(/npx -y sendme/)).toBeTruthy();
     // Download (will settle into "Coming soon" given 404)
