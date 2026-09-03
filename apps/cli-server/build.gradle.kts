@@ -154,3 +154,22 @@ tasks.register<Exec>("jpackageMsi") {
         "--win-shortcut",
     )
 }
+
+tasks.register<Exec>("jpackageDeb") {
+    group = "build"
+    description = "Build a Linux .deb installer (Linux only; disabled on other hosts)"
+    dependsOn("appImage")
+    enabled = isLinux
+    doFirst { installerDir.get().asFile.mkdirs() }
+    commandLine(
+        jpackageBin.absolutePath,
+        "--type", "deb",
+        "--name", "sendme",
+        "--vendor", "io.sendme",
+        "--app-version", appVersion,
+        "--app-image", appImageDir.get().asFile.absolutePath,
+        "--dest", installerDir.get().asFile.absolutePath,
+        "--linux-package-name", "sendme",
+        "--linux-deb-maintainer", "ektoras@index-zr0.com",
+    )
+}
