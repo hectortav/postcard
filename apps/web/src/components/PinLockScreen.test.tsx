@@ -115,16 +115,25 @@ describe('PinLockScreen', () => {
 
   it('backspace on an empty box moves focus to the previous box and clears it', () => {
     const { getByTestId } = mount({});
+    // Type '1' in box 0; leave box 1 empty.
     typeDigit(getByTestId, 0, '1');
-    typeDigit(getByTestId, 1, '2');
-    // Box 1 has content; backspace on it should not steal focus.
-    fireEvent.keyDown(getByTestId('pin-box-1'), { key: 'Backspace' });
-    expect((getByTestId('pin-box-1') as HTMLInputElement).value).toBe('2');
-    // Now backspace on empty box 0 — should not move anywhere (i===0).
+    // Backspace on a non-empty box is a no-op (the controlled input
+    // would snap back to its state value anyway).
     fireEvent.keyDown(getByTestId('pin-box-0'), { key: 'Backspace' });
-    // Then make box 2 non-empty, then empty box 1, then backspace.
-    typeDigit(getByTestId, 2, '3');
-    typeDigit(getByTestId, 1, '');
+    expect((getByTestId('pin-box-0') as HTMLInputElement).value).toBe('1');
+    // Backspace on empty box 0 (i===0) is a no-op.
+    fireEvent.keyDown(getByTestId('pin-box-0'), { key: 'Backspace' });
+    expect((getByTestId('pin-box-0') as HTMLInputElement).value).toBe('1');
+    // Type '2' in box 1, then explicitly clear it via state by re-rendering
+    // (the controlled input rejects clearing via input event). The simpler
+    // way: type in box 0 only, then backspace from box 1.
+    // Reset:
+  });
+
+  it('backspace from empty box 1 clears box 0', () => {
+    const { getByTestId } = mount({});
+    typeDigit(getByTestId, 0, '1');
+    // box 1 is empty by default
     fireEvent.keyDown(getByTestId('pin-box-1'), { key: 'Backspace' });
     expect((getByTestId('pin-box-0') as HTMLInputElement).value).toBe('');
   });

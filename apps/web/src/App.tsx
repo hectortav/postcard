@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useCallback, useEffect, useState } from 'preact/hooks';
 import stylex from '@stylexjs/stylex';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useWakeLock } from './hooks/useWakeLock';
@@ -6,6 +6,7 @@ import { DropZone } from './components/DropZone';
 import { FileList } from './components/FileList';
 import { Clipboard } from './components/Clipboard';
 import { QRCode } from './components/QRCode';
+import { PinLockScreen, type VerifyResult } from './components/PinLockScreen';
 import type { FileEntry, SendmeMode } from './types';
 
 const WS_URL = (): string => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
@@ -20,6 +21,38 @@ const TAB_LABEL: Record<Tab, string> = {
   qr: 'QR',
 };
 
+// Parse `?pin=<digits>` from the URL fragment. Returns the PIN length if
+// the fragment signals that the server was started with `--pin`; null
+// otherwise. The fragment is never sent to the server, so reading it is
+// safe.
+function readPinLengthFromHash(): number | null {
+  if (typeof location === 'undefined') return null;
+  const hash = location.hash.startsWith('#') ? location.hash.slice(1) : location.hash;
+  if (!hash) return null;
+  const params = new URLSearchParams(hash);
+  if (params.has('pin')) return 4;
+  return null;
+}
+
+async function verifyPinOnServer(pin: string): Promise<VerifyResult> {
+  try {
+    const res = await fetch('/api/pin/verify', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ pin }),
+    });
+    if (res.status === 200) return { ok: true };
+    if (res.status === 429) {
+      const body = await res.json().catch(() => ({}));
+      return { ok: false, reason: 'locked', lockoutMs: Number(body.lockoutMsRemaining) || 0 };
+    }
+    return { ok: false, reason: 'wrong' };
+  } catch {
+    // Network or parse error — treat as a wrong PIN so the user can retry.
+    return { ok: false, reason: 'wrong' };
+  }
+}
+
 export function App() {
   useWakeLock();
   const [tab, setTab] = useState<Tab>('files');
@@ -27,8 +60,14 @@ export function App() {
   const [clipboard, setClipboard] = useState<string>('');
   const [mode, setMode] = useState<SendmeMode>('lan');
   const [hotspot, setHotspot] = useState<{ ssid: string; password: string } | null>(null);
+  const [pinLength, setPinLength] = useState<number | null>(() => readPinLengthFromHash());
+  const [pinUnlocked, setPinUnlocked] = useState<boolean>(() => readPinLengthFromHash() === null);
 
   const { events, send } = useWebSocket(WS_URL());
+
+  const handlePinVerified = useCallback((_pin: string) => {
+    setPinUnlocked(true);
+  }, []);
 
   // One-shot initial hydration
   useEffect(() => {
@@ -62,56 +101,66 @@ export function App() {
 
   return (
     <div className={stylex(styles.shell)} data-mode={mode}>
-      <header className={stylex(styles.header)}>
-        <div className={stylex(styles.stripe)} aria-hidden="true" />
-        <h1 className={stylex(styles.title)}>sendme.</h1>
-        <p className={stylex(styles.subtitle)}>a one-shot way to move a file between two devices on the same wifi</p>
-      </header>
-      <nav className={stylex(styles.tabs)} role="tablist">
-        {TABS.map((t) => (
-          <button
-            key={t}
-            role="tab"
-            aria-selected={tab === t}
-            className={stylex(styles.tab, tab === t && styles.tabActive)}
-            onClick={() => setTab(t)}
-          >
-            {TAB_LABEL[t]}
-          </button>
-        ))}
-      </nav>
-      <main className={stylex(styles.main)}>
-        {tab === 'files' && (
-          <>
-            <DropZone />
-            <FileList files={files} />
-          </>
-        )}
-        {tab === 'clipboard' && (
-          <Clipboard
-            value={clipboard}
-            onChange={(t) => {
-              setClipboard(t);
-              send({ type: 'clipboard', text: t });
-            }}
-          />
-        )}
-        {tab === 'qr' &&
-          (hotspot ? (
-            <QRCode mode="hotspot" ssid={hotspot.ssid} password={hotspot.password} />
-          ) : (
-            <QRCode mode="lan" url={location.href} />
-          ))}
-      </main>
-      <footer className={stylex(styles.footer)}>
-        <span className={stylex(styles.mode)}>
-          {mode === 'hotspot' ? 'Hotspot' : 'LAN'}
-        </span>
-        <span className={stylex(styles.dot)} aria-hidden="true">·</span>
-        <span className={stylex(styles.bind)}>{location.host}</span>
-        <span className={stylex(styles.spacer)} />
-        <span className={stylex(styles.signoff)}>by air</span>
-      </footer>
+      {pinLength !== null && !pinUnlocked ? (
+        <PinLockScreen
+          pinLength={pinLength}
+          verify={verifyPinOnServer}
+          onVerified={handlePinVerified}
+        />
+      ) : (
+        <>
+          <header className={stylex(styles.header)}>
+            <div className={stylex(styles.stripe)} aria-hidden="true" />
+            <h1 className={stylex(styles.title)}>sendme.</h1>
+            <p className={stylex(styles.subtitle)}>a one-shot way to move a file between two devices on the same wifi</p>
+          </header>
+          <nav className={stylex(styles.tabs)} role="tablist">
+            {TABS.map((t) => (
+              <button
+                key={t}
+                role="tab"
+                aria-selected={tab === t}
+                className={stylex(styles.tab, tab === t && styles.tabActive)}
+                onClick={() => setTab(t)}
+              >
+                {TAB_LABEL[t]}
+              </button>
+            ))}
+          </nav>
+          <main className={stylex(styles.main)}>
+            {tab === 'files' && (
+              <>
+                <DropZone />
+                <FileList files={files} />
+              </>
+            )}
+            {tab === 'clipboard' && (
+              <Clipboard
+                value={clipboard}
+                onChange={(t) => {
+                  setClipboard(t);
+                  send({ type: 'clipboard', text: t });
+                }}
+              />
+            )}
+            {tab === 'qr' &&
+              (hotspot ? (
+                <QRCode mode="hotspot" ssid={hotspot.ssid} password={hotspot.password} />
+              ) : (
+                <QRCode mode="lan" url={location.href} />
+              ))}
+          </main>
+          <footer className={stylex(styles.footer)}>
+            <span className={stylex(styles.mode)}>
+              {mode === 'hotspot' ? 'Hotspot' : 'LAN'}
+            </span>
+            <span className={stylex(styles.dot)} aria-hidden="true">·</span>
+            <span className={stylex(styles.bind)}>{location.host}</span>
+            <span className={stylex(styles.spacer)} />
+            <span className={stylex(styles.signoff)}>by air</span>
+          </footer>
+        </>
+      )}
     </div>
   );
 }
