@@ -18,6 +18,9 @@ target/
 *.war
 hs_err_pid*
 replay_pid*
+# Exception: commit the Gradle wrapper jar so `./gradlew` works from a fresh clone.
+!gradle/wrapper/gradle-wrapper.jar
+!apps/cli-server/gradle/wrapper/gradle-wrapper.jar
 
 # Vite build output for the Java resource bundle — generated, not committed
 apps/cli-server/src/main/resources/public/
