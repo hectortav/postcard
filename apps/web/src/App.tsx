@@ -62,9 +62,20 @@ export function App() {
 
   return (
     <div className={stylex(styles.shell)} data-mode={mode}>
-      <nav className={stylex(styles.tabs)}>
+      <header className={stylex(styles.header)}>
+        <div className={stylex(styles.stripe)} aria-hidden="true" />
+        <h1 className={stylex(styles.title)}>sendme.</h1>
+        <p className={stylex(styles.subtitle)}>a one-shot way to move a file between two devices on the same wifi</p>
+      </header>
+      <nav className={stylex(styles.tabs)} role="tablist">
         {TABS.map((t) => (
-          <button key={t} className={stylex(styles.tab, tab === t && styles.tabActive)} onClick={() => setTab(t)}>
+          <button
+            key={t}
+            role="tab"
+            aria-selected={tab === t}
+            className={stylex(styles.tab, tab === t && styles.tabActive)}
+            onClick={() => setTab(t)}
+          >
             {TAB_LABEL[t]}
           </button>
         ))}
@@ -92,6 +103,15 @@ export function App() {
             <QRCode mode="lan" url={location.href} />
           ))}
       </main>
+      <footer className={stylex(styles.footer)}>
+        <span className={stylex(styles.mode)}>
+          {mode === 'hotspot' ? 'Hotspot' : 'LAN'}
+        </span>
+        <span className={stylex(styles.dot)} aria-hidden="true">·</span>
+        <span className={stylex(styles.bind)}>{location.host}</span>
+        <span className={stylex(styles.spacer)} />
+        <span className={stylex(styles.signoff)}>by air</span>
+      </footer>
     </div>
   );
 }
@@ -99,27 +119,135 @@ export function App() {
 const styles = stylex.create({
   shell: {
     minHeight: '100vh',
-    backgroundColor: '#0b0d10',
-    color: '#e7ecf3',
+    backgroundColor: '#F4EEE2',
+    color: '#1A1714',
     fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+    display: 'flex',
+    flexDirection: 'column',
+    WebkitFontSmoothing: 'antialiased',
+    textRendering: 'optimizeLegibility',
+  },
+  header: {
+    paddingTop: '20px',
+    paddingBottom: '20px',
+    paddingLeft: '24px',
+    paddingRight: '24px',
+    '@media (max-width: 480px)': {
+      paddingTop: '16px',
+      paddingBottom: '16px',
+      paddingLeft: '20px',
+      paddingRight: '20px',
+    },
+  },
+  stripe: {
+    height: '4px',
+    marginLeft: '-24px',
+    marginRight: '-24px',
+    marginBottom: '20px',
+    backgroundImage:
+      'repeating-linear-gradient(90deg, #A8332A 0 12px, #1F3A5F 12px 24px, #A8332A 24px 36px)',
+    '@media (max-width: 480px)': {
+      marginLeft: '-20px',
+      marginRight: '-20px',
+    },
+  },
+  title: {
+    fontFamily: '"Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif',
+    fontStyle: 'italic',
+    fontWeight: '400',
+    fontSize: 'clamp(40px, 8vw, 60px)',
+    lineHeight: '1',
+    margin: '0 0 8px 0',
+    color: '#1A1714',
+    letterSpacing: '-0.01em',
+  },
+  subtitle: {
+    fontSize: '15px',
+    lineHeight: '1.45',
+    color: '#4A443C',
+    margin: 0,
+    maxWidth: '34ch',
   },
   tabs: {
     display: 'flex',
-    gap: '8px',
-    padding: '16px',
-    borderBottom: `1px solid ${'#161a20'}`,
+    gap: '0',
+    paddingLeft: '24px',
+    paddingRight: '24px',
+    borderBottom: '1px solid #D8CDB7',
+    backgroundColor: '#F4EEE2',
+    position: 'sticky',
+    top: 0,
+    zIndex: 1,
+    '@media (max-width: 480px)': {
+      paddingLeft: '20px',
+      paddingRight: '20px',
+    },
   },
   tab: {
     background: 'transparent',
-    color: '#8b95a5',
+    color: '#8C8474',
     border: 'none',
-    padding: `${'8px'} ${'16px'}`,
-    borderRadius: '8px',
+    borderBottom: '2px solid transparent',
+    padding: '14px 16px',
+    marginBottom: '-1px',
     cursor: 'pointer',
+    fontSize: '15px',
+    fontFamily: 'inherit',
+    minHeight: '48px',
+    transitionProperty: 'color, border-color',
+    transitionDuration: '120ms',
+    outline: 'none',
+    ':focus-visible': {
+      color: '#1A1714',
+      borderBottomColor: '#A8332A',
+    },
   },
   tabActive: {
-    color: '#e7ecf3',
-    backgroundColor: '#161a20',
+    color: '#1A1714',
+    borderBottomColor: '#A8332A',
+    fontWeight: '500',
   },
-  main: { padding: '24px' },
+  main: {
+    padding: '24px',
+    flex: '1 0 auto',
+    maxWidth: '640px',
+    width: '100%',
+    marginLeft: 'auto',
+    marginRight: 'auto',
+    boxSizing: 'border-box',
+    '@media (max-width: 480px)': {
+      padding: '20px 16px',
+    },
+  },
+  footer: {
+    display: 'flex',
+    gap: '8px',
+    alignItems: 'center',
+    padding: '14px 24px',
+    borderTop: '1px solid #D8CDB7',
+    color: '#8C8474',
+    fontSize: '12px',
+    '@media (max-width: 480px)': {
+      padding: '12px 20px',
+      flexWrap: 'wrap',
+    },
+  },
+  mode: {
+    color: '#A8332A',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
+    fontSize: '11px',
+  },
+  dot: { color: '#D8CDB7' },
+  bind: {
+    fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
+    color: '#4A443C',
+  },
+  spacer: { flex: '1 1 auto' },
+  signoff: {
+    fontFamily: '"Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif',
+    fontStyle: 'italic',
+    color: '#8C8474',
+  },
 });
