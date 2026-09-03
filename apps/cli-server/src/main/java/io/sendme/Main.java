@@ -30,6 +30,33 @@ public final class Main {
         int actual = app.port();
         var url = "http://" + bind.getHostAddress() + ":" + actual + "/";
         if (server.keyMaterial() != null) url += "#key=" + server.keyB64Url();
+
+        // --pin wiring. The CLI derives the same AES key the receiver will
+        // derive in the browser, stores it on the server as the "expected"
+        // value, and prints the PIN to stdout so the sender can read it
+        // aloud or paste it. The URL fragment gains &pin=... so the receiver
+        // also has the PIN without an out-of-band channel.
+        String pin = null;
+        if (opts.pin != null) {
+            if (opts.pin.isBlank()) {
+                pin = String.format("%04d", (int) (Math.random() * 10000));
+            } else {
+                pin = opts.pin;
+            }
+            try {
+                byte[] secret = server.secretBytes();
+                String salt = io.sendme.security.PinSecurityEngine.saltFor(secret);
+                byte[] expected = io.sendme.security.PinSecurityEngine.deriveKey(secret, pin, salt).getEncoded();
+                server.setExpectedDerivedKey(expected);
+                server.setPinRequired(true);
+                url += (url.contains("#") ? "&" : "#") + "pin=" + pin;
+                System.out.println("PIN: " + pin);
+            } catch (Exception e) {
+                System.err.println("sendme: --pin wiring failed: " + e.getMessage());
+                System.exit(1);
+            }
+        }
+
         if (opts.authToken != null) url += (url.contains("?") ? "&" : "?") + "token=" + opts.authToken;
         System.out.println("BIND " + url);
         System.out.println(io.sendme.qr.QrRenderer.ansi(url));

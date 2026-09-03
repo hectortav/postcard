@@ -31,5 +31,8 @@ public class SendmeOptions implements Callable<Integer> {
     @CommandLine.Option(names = "--auth-token", description = "Optional WS handshake secret")
     public String authToken;
 
+    @CommandLine.Option(names = {"--pin"}, description = "Require a 4-digit PIN to access files. Auto-generates one if no value is given. The PIN is mixed into the AES-256 key derivation and printed to stdout.")
+    public String pin;
+
     @Override public Integer call() { return 0; }
 }

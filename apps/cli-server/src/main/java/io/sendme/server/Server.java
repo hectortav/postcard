@@ -43,6 +43,10 @@ public final class Server {
         store.setAddListener(e -> hub.broadcast("{\"type\":\"file_added\",\"id\":\"" + e.id() + "\",\"name\":\"" + json(e.name()) + "\",\"size\":" + e.size() + ",\"mtime\":" + e.mtime() + ",\"sha256\":\"" + e.sha256() + "\"}"));
         store.setRemoveListener(id -> hub.broadcast("{\"type\":\"file_removed\",\"id\":\"" + id + "\"}"));
         if (opts.encrypt) { var k = new byte[32]; new SecureRandom().nextBytes(k); keyMaterial = new KeyMaterial(k); }
+        // --pin implies we still need a random secret to feed the KDF (the
+        // receiver mixes the PIN with this secret in their browser). Without
+        // this, /api/pin/verify would have nothing to derive against.
+        if (opts.pin != null && keyMaterial == null) { var k = new byte[32]; new SecureRandom().nextBytes(k); keyMaterial = new KeyMaterial(k); }
     }
 
     public String keyB64Url() { return keyMaterial == null ? null : Base64.getUrlEncoder().withoutPadding().encodeToString(keyMaterial.key()); }
