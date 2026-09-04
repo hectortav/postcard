@@ -155,12 +155,17 @@ public final class Server {
             ctx.header("ETag", "\"" + entry.sha256() + "\"");
 
             if (keyMaterial != null) {
-                // Encrypted mode: ignore Range, full ciphertext+tag
+                // Encrypted mode: ignore Range, full ciphertext+tag. After
+                // the PIN is verified the derived key (which mixes the URL
+                // secret with the user's PIN) is used for encryption. The
+                // original keyMaterial is kept around so the verify route
+                // can keep re-deriving and re-checking the PIN.
+                KeyMaterial effective = derivedKey != null ? new KeyMaterial(derivedKey) : keyMaterial;
                 long ctLen = ChunkCipher.chunkContentLength(size);
                 ctx.status(200);
                 ctx.res().setContentLengthLong(ctLen);
                 try (var in = java.nio.file.Files.newInputStream(p); var out = ctx.outputStream()) {
-                    ChunkCipher.encryptStream(in, out, keyMaterial);
+                    ChunkCipher.encryptStream(in, out, effective);
                 }
                 return;
             }

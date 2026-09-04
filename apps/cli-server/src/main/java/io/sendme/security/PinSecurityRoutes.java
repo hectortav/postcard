@@ -106,13 +106,15 @@ public final class PinSecurityRoutes {
             return;
         }
 
-        // Success: re-derive the key from (secret, pin, salt) and hand it to
-        // the Server so subsequent /api/files and /api/download calls can
-        // use it instead of the random secret.
+        // Success: re-derive the key from (secret, pin, salt) and store it
+        // on the Server so subsequent /api/files and /api/download calls
+        // can use it (mixed with the PIN) instead of the raw random secret.
+        // We deliberately do NOT replace keyMaterial here — the original
+        // secret is what /api/pin/verify compares against, so swapping it
+        // out would lock out any subsequent verify attempt (e.g. a second
+        // device joining the same session).
         byte[] derived = PinSecurityEngine.deriveKey(server.secretBytes(), pin, PinSecurityEngine.saltFor(server.secretBytes())).getEncoded();
         server.setDerivedKey(derived);
-        // also update keyMaterial so the existing ChunkCipher path keeps working
-        server.replaceKeyMaterial(new KeyMaterial(derived));
         limiter.recordSuccess(ip);
         ctx.status(200).json(Map.of());
     }
