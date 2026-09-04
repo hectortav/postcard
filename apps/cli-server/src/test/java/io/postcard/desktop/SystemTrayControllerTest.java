@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  *       that touches the JDK's static {@code SystemTray.isSupported()}; runs on
  *       CI and asserts the no-op return + INFO log.</li>
  *   <li>{@link #buildIconPopulatesMenuAndListeners()} — calls the package-private
- *       {@link SystemTrayController#buildIcon(String, Runnable)} factory directly
+ *       {@link SystemTrayController#buildIcon(String, Runnable, Runnable)} factory directly
  *       to inspect the constructed {@link TrayIcon}, its {@link PopupMenu}, and
  *       the action listeners attached to each item. Uses real AWT objects (no
  *       Mockito) so the test is deterministic and platform-independent.</li>
@@ -35,7 +35,7 @@ class SystemTrayControllerTest {
         // On every CI runner, headless Linux without a status-notifier host, and
         // SSH sessions, SystemTray.isSupported() returns false. The controller
         // must return Optional.empty() without throwing.
-        Optional<TrayIcon> result = SystemTrayController.install("http://127.0.0.1:8080/", () -> {});
+        Optional<TrayIcon> result = SystemTrayController.install("http://127.0.0.1:8080/", () -> {}, () -> {});
         if (!SystemTray.isSupported()) {
             assertTrue(result.isEmpty(), "isSupported==false must yield Optional.empty()");
         } else {
@@ -61,7 +61,7 @@ class SystemTrayControllerTest {
         String url = "http://192.168.1.5:8080/";
         AtomicInteger quitCount = new AtomicInteger(0);
 
-        TrayIcon icon = SystemTrayController.buildIcon(url, quitCount::incrementAndGet);
+        TrayIcon icon = SystemTrayController.buildIcon(url, () -> {}, quitCount::incrementAndGet);
         assertNotNull(icon);
         assertEquals("postcard — " + url, icon.getToolTip());
         assertTrue(icon.isImageAutoSize(), "image should be auto-sized for crispness");
@@ -115,7 +115,7 @@ class SystemTrayControllerTest {
         // Defensive: callers can pass null for the quit hook (Main wires one
         // but tests / future use might not). The build itself must not NPE.
         TrayIcon icon = assertDoesNotThrow(() ->
-            SystemTrayController.buildIcon("http://127.0.0.1:0/", null));
+            SystemTrayController.buildIcon("http://127.0.0.1:0/", null, null));
         assertNotNull(icon);
         assertNotNull(icon.getPopupMenu());
     }
@@ -126,5 +126,20 @@ class SystemTrayControllerTest {
             if (item != null && label.equals(item.getLabel())) return item;
         }
         return null;
+    }
+
+    @Test void openDashboardMenuItemDelegatesToTheDashboard() {
+        // The tray used to launch a browser itself. It now knows only that *something* shows
+        // the dashboard, which is what lets Main swap the implementation.
+        var dashboard = new FakeDashboard();
+        TrayIcon icon = SystemTrayController.buildIcon(
+            "http://192.168.1.5:8080/", dashboard::open, () -> {});
+
+        MenuItem open = icon.getPopupMenu().getItem(0);
+        assertEquals("Open Dashboard", open.getLabel());
+        open.getActionListeners()[0].actionPerformed(
+            new java.awt.event.ActionEvent(open, java.awt.event.ActionEvent.ACTION_PERFORMED, "open"));
+
+        assertEquals(1, dashboard.opens, "the tray must delegate to the dashboard");
     }
 }

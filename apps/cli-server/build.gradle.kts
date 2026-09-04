@@ -215,6 +215,9 @@ tasks.register<Exec>("appImage") {
         addAll(listOf("--dest", appImageDir.get().asFile.parentFile.absolutePath))
         // Chromium needs a real AWT toolkit, and JCEF needs these opens on macOS from JDK 16 on.
         addAll(listOf("--java-options", "-Djava.awt.headless=false"))
+        // JCEF calls System.loadLibrary. On JDK 25 that is a restricted method: it warns today
+        // and is documented to be blocked in a future release unless native access is granted.
+        addAll(listOf("--java-options", "--enable-native-access=ALL-UNNAMED"))
         if (isMac) {
             addAll(listOf("--java-options", "--add-opens=java.desktop/sun.awt=ALL-UNNAMED"))
             addAll(listOf("--java-options", "--add-opens=java.desktop/sun.lwawt=ALL-UNNAMED"))

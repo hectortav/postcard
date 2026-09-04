@@ -11,7 +11,6 @@ import java.awt.Toolkit;
 import java.awt.TrayIcon;
 import java.awt.datatransfer.StringSelection;
 import java.awt.event.ActionEvent;
-import java.net.URI;
 import java.util.Optional;
 
 /**
@@ -19,8 +18,8 @@ import java.util.Optional;
  *
  * <p>The icon has three menu items:
  * <ol>
- *   <li><b>Open Dashboard</b> — re-invokes {@link java.awt.Desktop#browse(URI)} on the
- *       server URL.</li>
+ *   <li><b>Open Dashboard</b> — asks the caller-supplied action to show the dashboard
+ *       window. The controller does not know how the dashboard is rendered.</li>
  *   <li><b>Copy Local URL</b> — places the server URL on the system clipboard.</li>
  *   <li><b>Quit</b> — invokes the caller-supplied shutdown {@link Runnable}. The
  *       controller deliberately does not call {@link System#exit(int)} itself; the
@@ -44,7 +43,7 @@ public final class SystemTrayController {
      * host, SSH sessions, CI). The caller should treat the empty result as "no
      * tray available, continue without it".
      */
-    public static Optional<TrayIcon> install(String url, Runnable onQuit) {
+    public static Optional<TrayIcon> install(String url, Runnable onOpen, Runnable onQuit) {
         try {
             if (!SystemTray.isSupported()) {
                 log.info("SystemTray not supported on this platform; running without tray icon");
@@ -52,7 +51,7 @@ public final class SystemTrayController {
             }
             SystemTray tray = SystemTray.getSystemTray();
 
-            TrayIcon icon = buildIcon(url, onQuit);
+            TrayIcon icon = buildIcon(url, onOpen, onQuit);
             try {
                 tray.add(icon);
             } catch (java.awt.AWTException e) {
@@ -92,7 +91,7 @@ public final class SystemTrayController {
      * use {@link #install(String, Runnable)} which wraps this in a
      * {@link SystemTray#add(TrayIcon)} call.
      */
-    static TrayIcon buildIcon(String url, Runnable onQuit) {
+    static TrayIcon buildIcon(String url, Runnable onOpen, Runnable onQuit) {
         Image image = TrayIconFactory.create(64);
         TrayIcon icon = new TrayIcon(image, "postcard — " + url);
         icon.setToolTip("postcard — " + url);
@@ -101,7 +100,10 @@ public final class SystemTrayController {
         PopupMenu menu = new PopupMenu();
 
         MenuItem open = new MenuItem("Open Dashboard");
-        open.addActionListener((ActionEvent e) -> openDashboard(url, icon));
+        open.addActionListener((ActionEvent e) -> {
+            log.info("postcard tray: open dashboard requested");
+            if (onOpen != null) onOpen.run();
+        });
         menu.add(open);
 
         MenuItem copy = new MenuItem("Copy Local URL");
@@ -119,30 +121,6 @@ public final class SystemTrayController {
 
         icon.setPopupMenu(menu);
         return icon;
-    }
-
-    private static void openDashboard(String url, TrayIcon icon) {
-        try {
-            // java.awt.Desktop may throw HeadlessException in some CI/test envs
-            // and UnsupportedOperationException on platforms without a registered
-            // handler (rare). Both are logged at WARN; the user can copy the URL
-            // via the next menu item.
-            // Prefer the chromeless app window, so the tray reopens the same surface
-            // the app started with rather than dropping the user into a browser tab.
-            if (BrowserLauncher.launchAppWindow(url).isEmpty()) {
-                java.awt.Desktop.getDesktop().browse(URI.create(url));
-            }
-            log.info("postcard tray: opened dashboard ({})", url);
-        } catch (Exception e) {
-            log.warn("postcard tray: could not open browser ({}); user should copy URL from menu", e.getMessage());
-            // Best-effort user feedback: pop a tray balloon if the EDT is up.
-            try {
-                java.awt.EventQueue.invokeLater(() ->
-                    icon.displayMessage("postcard", "Could not open browser: " + url, TrayIcon.MessageType.INFO));
-            } catch (Exception _) {
-                // EventQueue not available (e.g. test env) — already logged above.
-            }
-        }
     }
 
     private static void copyUrl(String url) {

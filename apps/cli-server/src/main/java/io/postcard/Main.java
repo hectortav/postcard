@@ -60,10 +60,21 @@ public final class Main {
         if (opts.authToken != null) url += (url.contains("?") ? "&" : "?") + "token=" + opts.authToken;
         System.out.println("BIND " + url);
         System.out.println(io.postcard.qr.QrRenderer.ansi(url));
-        // One shutdown sequence, three callers: the tray's Quit item, the idle watcher,
-        // and the JVM shutdown hook. `cleanup` is safe inside a shutdown hook (no
-        // System.exit); `quit` is the user-initiated variant that also exits.
+        // One shutdown sequence, three callers: the tray's Quit item, the dashboard window's
+        // close button, and the JVM shutdown hook. `cleanup` is safe inside a shutdown hook
+        // (no System.exit); `quit` is the user-initiated variant that also exits.
+        //
+        // The dashboard is reached through a reference because the shutdown runnables are built
+        // before it: the window's close button needs `quit`, and `cleanup` needs to dispose
+        // CEF. Same reason for the notifier, which only exists once the tray is installed.
+        final var dashboardRef = new java.util.concurrent.atomic.AtomicReference<io.postcard.desktop.Dashboard>();
+        final var notify = new java.util.concurrent.atomic.AtomicReference<
+            java.util.function.Consumer<io.postcard.desktop.Notifier.Event>>(
+                io.postcard.desktop.Notifier.sink(_ -> {}));
+
         final Runnable cleanup = () -> {
+            var d = dashboardRef.get();
+            if (d != null) d.close();                                  // stop Chromium first
             try { app.jettyServer().stop(); } catch (Exception _) {}   // stop accepting connections
             Shutdown.drain(3, () -> {}, () -> server.hub().close());          // drain in-flight, close hub
             if (server.tempDir()) deleteTree(server.store().dir());
@@ -71,42 +82,41 @@ public final class Main {
         };
         final Runnable quit = () -> { cleanup.run(); System.exit(0); };
 
-        // Open the dashboard as a chromeless window where possible, falling back to an
-        // ordinary tab when no Chromium-family browser is installed.
-        final java.util.function.Consumer<String> openDashboard = u -> {
-            if (io.postcard.desktop.BrowserLauncher.launchAppWindow(u).isEmpty()) {
-                io.postcard.desktop.DesktopIntegration.browse(u);
-            }
-        };
-
-        if (!opts.noBrowser) openDashboard.accept(url);
         if (!opts.headless) {
+            // Closing the dashboard quits postcard, unconditionally. Deliberate: a phone
+            // mid-transfer is not consulted. See
+            // docs/superpowers/specs/2026-09-04-postcard-embedded-browser-design.md.
+            var dashboard = io.postcard.desktop.EmbeddedDashboard.create(
+                url,
+                io.postcard.desktop.CefNatives.locate(),
+                quit,
+                io.postcard.desktop.DesktopIntegration::browse,
+                event -> notify.get().accept(event));
+            dashboardRef.set(dashboard);
+
+            // Nothing is built until open() is called, so --no-browser costs no Chromium.
+            if (!opts.noBrowser) dashboard.open();
+
             // macOS does not re-run main() when the user clicks the Dock icon of an
-            // already-running bundled app; it sends a reopen event instead.
-            io.postcard.desktop.DesktopIntegration.installReopenHandler(url, openDashboard);
+            // already-running bundled app; it sends a reopen event instead. Raising our own
+            // window is the whole point: this used to exec a second browser every press.
+            io.postcard.desktop.DesktopIntegration.installReopenHandler(url, _ -> dashboard.open());
+
             // Install the menu-bar / system-tray icon. install() returns
             // Optional.empty() on platforms without a status-notifier host
             // (headless Linux, SSH sessions, CI). The desktop integration is
             // gated behind !opts.headless so GraalVM native builds can stay
             // AWT-free by passing --headless at run time.
             java.util.Optional<java.awt.TrayIcon> trayIcon =
-                io.postcard.desktop.SystemTrayController.install(url, quit);
+                io.postcard.desktop.SystemTrayController.install(url, dashboard::open, quit);
             trayIcon.ifPresent(icon -> Runtime.getRuntime().addShutdownHook(new Thread(() ->
                 io.postcard.desktop.SystemTrayController.remove(icon), "postcard-tray-remove")));
+
             // Announce peer uploads and downloads through the tray. The browser's
             // Notification API is unavailable here: it requires a secure context and
             // postcard serves over http on a LAN address.
-            server.setNotifier(io.postcard.desktop.Notifier.forTray(trayIcon), bind.getHostAddress());
-        }
-        // Closing the last dashboard makes postcard quit. Connected clients -- including a
-        // phone that still has the page open -- keep it alive, which is the behaviour
-        // watching the browser process could never get right.
-        if (!opts.noBrowser && !opts.headless) {
-            io.postcard.desktop.IdleWatcher.start(
-                () -> server.hub().size(),
-                java.time.Duration.ofSeconds(2),
-                java.time.Duration.ofSeconds(20),
-                quit);
+            notify.set(io.postcard.desktop.Notifier.forTray(trayIcon));
+            server.setNotifier(event -> notify.get().accept(event), bind.getHostAddress());
         }
         Runtime.getRuntime().addShutdownHook(new Thread(cleanup, "postcard-shutdown"));
     }

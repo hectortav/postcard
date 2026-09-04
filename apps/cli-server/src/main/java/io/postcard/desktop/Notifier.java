@@ -52,6 +52,11 @@ public final class Notifier {
         return new Event("postcard", "Someone downloaded " + elide(fileName));
     }
 
+    /** A file the host saved through the embedded dashboard window finished downloading. */
+    public static Event saved(String fileName) {
+        return new Event("postcard", "Saved " + elide(fileName));
+    }
+
     private static String elide(String name) {
         var n = name == null ? "(unnamed)" : name;
         return n.length() <= MAX_NAME ? n : n.substring(0, MAX_NAME - 1) + "…";
