@@ -5,7 +5,7 @@ let other devices on the LAN (or your hotspot) download — all in-process, no c
 no accounts.
 
 The marketing site lives at [`apps/landing`](apps/landing) and is published to
-GitHub Pages at <https://index-zr0.github.io/sendme/>.
+GitHub Pages when a `v*.*.*` tag is pushed (see [Release workflow](#release-workflow)).
 
 ## Quick start
 
@@ -33,6 +33,7 @@ the page, copy the link.
 | `-h, --host` | auto | bind override |
 | `-d, --path` | temp dir | directory to share |
 | `-e, --encrypt` | off | AES-256-GCM, key in URL hash |
+| `--pin [code]` | off | 4-digit PIN gates `/api/files` and `/api/download/{id}`. Auto-generates a PIN if no value is given; the PIN mixes into the AES-256 key derivation (PBKDF2-HMAC-SHA256, 200k iter). 3 wrong attempts from the same IP lock that IP out for 15 min. |
 | `--no-browser` | off | skip `Desktop.browse` |
 | `--headless` | off | daemon mode: no tray icon, no auto-browser |
 | `--max-upload <MiB>` | unbounded | pre-disk enforcement |
@@ -72,5 +73,28 @@ Notes:
   warnings are expected. Code signing is a v0.2+ concern.
 - The bundled JRE is the full JDK 21 runtime (~170 MB on disk before DMG
   compression). A `jlink`-stripped runtime is a future enhancement.
-- Cross-platform CI builds (run each platform's task on its own runner) are
-  Phase 10.
+
+## Release workflow
+
+[`.github/workflows/release.yml`](.github/workflows/release.yml) builds the
+platform installers on every `v*.*.*` tag push and uploads them as
+`sendme-installer-{ubuntu,macos,windows}` artifacts. The GitHub Pages
+deploy step is scaffolded (commented out) at the bottom of the file —
+uncomment it when the first hand-cut tag is ready and the landing page
+should go live alongside the installers.
+
+## Security
+
+- **Encryption** (`--encrypt` / `--pin`): AES-256-GCM, 12-byte nonce + 16-byte
+  tag per 64 KiB plaintext chunk. Key in URL hash, never on the wire. The
+  PIN is mixed into the key via PBKDF2-HMAC-SHA256 (200k iterations) so
+  knowing the URL alone is insufficient to decrypt the file stream.
+- **Rate limit**: per-IP, 3 wrong PINs → 15-minute lockout (returns 429 with
+  `lockoutMsRemaining` so the UI can show a countdown).
+- **Coverage gate**: new `io.sendme.security.*` code is held to 100% line +
+  branch coverage by the `coverage` CI job; the rest of the repo is held
+  to 90% (JaCoCo + Vitest thresholds).
+
+See [`docs/superpowers/plans/2026-09-03-sendme-pin-coverage.md`](docs/superpowers/plans/2026-09-03-sendme-pin-coverage.md)
+for the PIN-security design and [`apps/cli-server/src/main/java/io/sendme/security/`](apps/cli-server/src/main/java/io/sendme/security/)
+for the implementation.
