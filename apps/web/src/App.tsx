@@ -116,15 +116,22 @@ export function App() {
           </header>
           <nav className={stylex(styles.tabs)} role="tablist">
             {TABS.map((t) => (
-              <button
+              <div
                 key={t}
                 role="tab"
+                tabIndex={0}
                 aria-selected={tab === t}
                 className={stylex(styles.tab, tab === t && styles.tabActive)}
                 onClick={() => setTab(t)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setTab(t);
+                  }
+                }}
               >
                 {TAB_LABEL[t]}
-              </button>
+              </div>
             ))}
           </nav>
           <main className={stylex(styles.main)}>
@@ -246,6 +253,13 @@ const styles = stylex.create({
     transitionProperty: 'color, border-color',
     transitionDuration: '120ms',
     outline: 'none',
+    userSelect: 'none',
+    // Text colour is the only hover cue — no background change. The 2px
+    // bottom border is reserved for the active state, so it stays
+    // transparent on every other tab.
+    ':hover': {
+      color: '#1A1714',
+    },
     ':focus-visible': {
       color: '#1A1714',
       borderBottomColor: '#A8332A',
