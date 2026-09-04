@@ -56,6 +56,12 @@ jobs:
       # The shadow JAR is the seed for jpackage's app-image step.
       - run: cd apps/cli-server && ./gradlew shadowJar
 
+      # Chromium natives for this runner's platform, bundled into the installer so a first
+      # launch never needs the network -- postcard is usually reached for offline, on a LAN.
+      # ~300MB per platform, which is why this runs per-runner rather than once.
+      - name: Install JCEF natives
+        run: cd apps/cli-server && ./gradlew installCefNatives
+
       # Pick the right jpackage task per OS. Each task is gated inside
       # build.gradle.kts so a wrong-OS run is a no-op with a clear log
       # line rather than a cryptic tool failure.
