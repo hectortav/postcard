@@ -23,6 +23,7 @@ dependencies {
     implementation(libs.zxing.javase)
     implementation(libs.slf4j.api)
     implementation(libs.jackson.databind)
+    implementation(libs.jcefmaven)
     runtimeOnly(libs.logback.classic)
 
     testImplementation(libs.junit.jupiter)
@@ -166,27 +167,60 @@ val iconFile: java.io.File = layout.projectDirectory
 val appVersion: String =
     if (version.toString().startsWith("0.")) "1.0" else version.toString()
 
+// JCEF natives for the *host* platform. Downloaded once at build time and bundled into the
+// installer, so the app never needs the network on first run -- postcard is most often
+// reached for offline, on a LAN.
+val cefBundleDir = layout.buildDirectory.dir("jcef-bundle")
+
+tasks.register<JavaExec>("installCefNatives") {
+    group = "build"
+    description = "Download and unpack JCEF natives for the host platform into build/jcef-bundle"
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("io.postcard.tools.InstallCefNatives")
+    argumentProviders.add { listOf(cefBundleDir.get().asFile.absolutePath) }
+    outputs.dir(cefBundleDir)
+}
+
+// jpackage copies everything in --input into the app image's `app/` directory. Staging the
+// shadow jar and the natives together keeps build/libs clean and puts jcef-bundle exactly
+// where CefNatives.locate() looks for it: beside the jar.
+val jpackageInputDir = layout.buildDirectory.dir("jpackage-input")
+
+tasks.register<Sync>("jpackageInput") {
+    dependsOn("shadowJar", "installCefNatives")
+    into(jpackageInputDir)
+    from(shadowJarFile)
+    from(cefBundleDir) { into("jcef-bundle") }
+}
+
 tasks.register<Exec>("appImage") {
     group = "build"
     description = "Build a self-contained app image (executable + bundled JRE) via jpackage"
-    dependsOn("shadowJar")
+    dependsOn("jpackageInput")
     // jpackage refuses to overwrite an existing dest, so wipe it each run.
     doFirst {
         appImageDir.get().asFile.deleteRecursively()
         appImageDir.get().asFile.parentFile.mkdirs()
     }
-    commandLine(
-        jpackageBin.absolutePath,
-        "--type", "app-image",
-        "--name", "postcard",
-        "--vendor", "io.postcard",
-        "--app-version", appVersion,
-        "--icon", iconFile.absolutePath,
-        "--input", shadowJarFile.parentFile.absolutePath,
-        "--main-jar", shadowJarFile.name,
-        "--main-class", "io.postcard.Main",
-        "--dest", appImageDir.get().asFile.parentFile.absolutePath,
-    )
+    commandLine(buildList {
+        add(jpackageBin.absolutePath)
+        addAll(listOf("--type", "app-image"))
+        addAll(listOf("--name", "postcard"))
+        addAll(listOf("--vendor", "io.postcard"))
+        addAll(listOf("--app-version", appVersion))
+        addAll(listOf("--icon", iconFile.absolutePath))
+        addAll(listOf("--input", jpackageInputDir.get().asFile.absolutePath))
+        addAll(listOf("--main-jar", shadowJarFile.name))
+        addAll(listOf("--main-class", "io.postcard.Main"))
+        addAll(listOf("--dest", appImageDir.get().asFile.parentFile.absolutePath))
+        // Chromium needs a real AWT toolkit, and JCEF needs these opens on macOS from JDK 16 on.
+        addAll(listOf("--java-options", "-Djava.awt.headless=false"))
+        if (isMac) {
+            addAll(listOf("--java-options", "--add-opens=java.desktop/sun.awt=ALL-UNNAMED"))
+            addAll(listOf("--java-options", "--add-opens=java.desktop/sun.lwawt=ALL-UNNAMED"))
+            addAll(listOf("--java-options", "--add-opens=java.desktop/sun.lwawt.macosx=ALL-UNNAMED"))
+        }
+    })
 }
 
 tasks.register<Exec>("jpackageDmg") {

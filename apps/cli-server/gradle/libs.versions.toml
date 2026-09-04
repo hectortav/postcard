@@ -22,6 +22,11 @@ mockito = "5.12.0"
 # so we use the first 9.x release, which is the line aligned with Gradle 9.
 shadow = "9.0.0"
 native = "0.10.2"
+# JCEF (embedded Chromium) via jcefmaven. The version tracks the Chromium major:
+# 146.0.10 is the current release. Natives are downloaded once at build time by the
+# `installCefNatives` task and bundled into the installer, so the app itself runs with
+# setSkipInstallation(true) and never touches the network on first run.
+jcef = "146.0.10"
 
 [libraries]
 javalin = { module = "io.javalin:javalin", version.ref = "javalin" }
@@ -35,6 +40,7 @@ jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", ver
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
 mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
 mockito-inline = { module = "org.mockito:mockito-inline", version.ref = "mockito" }
+jcefmaven = { module = "me.friwi:jcefmaven", version.ref = "jcef" }
 
 [plugins]
 shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
