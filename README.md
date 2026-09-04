@@ -34,14 +34,22 @@ the page, copy the link.
 | `-d, --path` | temp dir | directory to share |
 | `-e, --encrypt` | off | AES-256-GCM, key in URL hash |
 | `--pin [code]` | off | 4-digit PIN gates `/api/files` and `/api/download/{id}`. Auto-generates a PIN if no value is given; the PIN mixes into the AES-256 key derivation (PBKDF2-HMAC-SHA256, 200k iter). 3 wrong attempts from the same IP lock that IP out for 15 min. |
-| `--no-browser` | off | skip `Desktop.browse` |
+| `--no-browser` | off | start without opening the dashboard window (the tray can still open it, and no Chromium is loaded until it does) |
 | `--headless` | off | daemon mode: no tray icon, no auto-browser |
 | `--max-upload <MiB>` | unbounded | pre-disk enforcement |
 | `--auth-token` | none | optional WS handshake secret |
 
+The dashboard opens in a window postcard owns, rendered by an embedded Chromium
+(JCEF) bundled inside the app — no external browser is launched, and the natives
+ship in the installer so a first launch works with no network. **Closing that
+window quits postcard**, including any transfer a phone still has in flight.
+Bundling Chromium is why the installers are large (the macOS app image is ~458 MB
+before compression).
+
 When a tray icon is available, postcard shows a desktop notification whenever
 *another* device uploads a file or downloads one of yours. Your own uploads and
 downloads stay silent, and `--headless` disables notifications entirely.
+`--headless` also skips the window and never initializes Chromium.
 
 See [`docs/superpowers/specs/2026-09-03-postcard-design.md`](docs/superpowers/specs/2026-09-03-postcard-design.md)
 for the design spec and [`docs/superpowers/plans/2026-09-03-postcard-impl.md`](docs/superpowers/plans/2026-09-03-postcard-impl.md)
