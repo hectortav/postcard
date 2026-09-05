@@ -34,6 +34,8 @@ public final class Server {
     // True when the CLI was launched with --pin. Gates /api/files and
     // /api/download/{id} until derivedKey is set.
     private volatile boolean pinRequired;
+    // LAN address bound at startup; null until Main sets it. See setBindHost.
+    private volatile String bindHost;
 
     public Server(PostcardOptions opts) { this.opts = opts; }
 
@@ -94,6 +96,63 @@ public final class Server {
 
     /** Atomically swap the AES key the download route uses. */
     public void replaceKeyMaterial(KeyMaterial km) { this.keyMaterial = km; }
+
+    /**
+     * LAN address this server bound (set by Main after interface selection).
+     * PIN management is owner-only: a request counts as the owner exactly when
+     * its source IP equals this address. Anything else — receivers on phones,
+     * LAN scanners — gets 403 from the configure route. Fail-closed by design:
+     * unset means nobody manages.
+     */
+    public void setBindHost(String bindHost) { this.bindHost = bindHost; }
+
+    /** Owner check for PIN management; see {@link #setBindHost(String)}. */
+    public boolean isOwnerIp(String ip) {
+        return bindHost != null && bindHost.equals(ip);
+    }
+
+    /**
+     * Arm (or re-arm) PIN protection with the given PIN, at startup or at runtime
+     * from the dashboard. Creates the random KDF secret when the session has none
+     * yet (plain mode), derives the expected key, arms the gate and drops any
+     * previously verified key so every receiver re-verifies under the new PIN.
+     *
+     * @param pin exactly 4 ASCII digits
+     * @throws IllegalArgumentException when the PIN has the wrong shape
+     */
+    public synchronized void enablePin(String pin) {
+        if (pin == null || !pin.matches("^[0-9]{4}$")) {
+            throw new IllegalArgumentException("pin must be exactly 4 digits");
+        }
+        // --pin implies a secret even in plain mode (mirrors init()): the receiver
+        // mixes the PIN with it in their browser, so verify needs something to
+        // derive against.
+        if (keyMaterial == null) {
+            var k = new byte[32];
+            new SecureRandom().nextBytes(k);
+            keyMaterial = new KeyMaterial(k);
+        }
+        try {
+            String salt = io.postcard.security.PinSecurityEngine.saltFor(secretBytes());
+            expectedDerivedKey = io.postcard.security.PinSecurityEngine
+                .deriveKey(secretBytes(), pin, salt).getEncoded();
+        } catch (Exception e) {
+            throw new IllegalStateException("pin key derivation failed", e);
+        }
+        derivedKey = null;
+        pinRequired = true;
+    }
+
+    /**
+     * Drop PIN protection at runtime. The KDF secret is deliberately kept (same as
+     * --encrypt semantics): downloads stay encrypted under it and the URL keeps
+     * its #key= fragment; only the PIN gate and the expected key go away.
+     */
+    public synchronized void disablePin() {
+        pinRequired = false;
+        expectedDerivedKey = null;
+        derivedKey = null;
+    }
 
     /** Per-IP PIN rate limiter. */
     public io.postcard.security.PinRateLimiter pinLimiter() { return pinLimiter; }

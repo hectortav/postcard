@@ -33,7 +33,7 @@ the page, copy the link.
 | `-h, --host` | auto | bind override |
 | `-d, --path` | temp dir | directory to share |
 | `-e, --encrypt` | off | AES-256-GCM, key in URL hash |
-| `--pin [code]` | off | 4-digit PIN gates `/api/files` and `/api/download/{id}`. Auto-generates a PIN if no value is given; the PIN mixes into the AES-256 key derivation (PBKDF2-HMAC-SHA256, 200k iter). 3 wrong attempts from the same IP lock that IP out for 15 min. |
+| `--pin [code]` | off | 4-digit PIN gates `/api/files` and `/api/download/{id}`. Auto-generates a PIN if no value is given; the PIN mixes into the AES-256 key derivation (PBKDF2-HMAC-SHA256, 200k iter). 3 wrong attempts from the same IP lock that IP out for 15 min. The dashboard's PIN protection section can enable, change or disable the PIN at runtime (host computer only; receivers never see it). |
 | `--no-browser` | off | start without opening the dashboard window (the tray can still open it, and no Chromium is loaded until it does) |
 | `--headless` | off | daemon mode: no tray icon, no auto-browser |
 | `--max-upload <MiB>` | unbounded | pre-disk enforcement |

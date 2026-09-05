@@ -4,6 +4,7 @@ import { useWebSocket } from './hooks/useWebSocket';
 import { useWakeLock } from './hooks/useWakeLock';
 import { DropZone } from './components/DropZone';
 import { FileList } from './components/FileList';
+import { PinSettings } from './components/PinSettings';
 import { Clipboard } from './components/Clipboard';
 import { Stamp } from './components/Stamp';
 import { QRCode } from './components/QRCode';
@@ -63,6 +64,15 @@ export function App() {
   const [hotspot, setHotspot] = useState<{ ssid: string; password: string } | null>(null);
   const pinLength = useMemo<number | null>(() => readPinLengthFromHash(), []);
   const [pinUnlocked, setPinUnlocked] = useState<boolean>(() => readPinLengthFromHash() === null);
+  // The PIN settings rewrite location.hash (key/pin for QR sharing); track it so
+  // the QR tab re-renders with the fresh URL. Hash assignment fires hashchange
+  // natively, so no manual event is needed.
+  const [href, setHref] = useState<string>(() => location.href);
+  useEffect(() => {
+    const onHash = () => setHref(location.href);
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
 
   const { events, send } = useWebSocket(WS_URL());
 
@@ -144,6 +154,7 @@ export function App() {
               <>
                 <DropZone />
                 <FileList files={files} />
+                <PinSettings />
               </>
             )}
             {tab === 'clipboard' && (
@@ -159,7 +170,7 @@ export function App() {
               (hotspot ? (
                 <QRCode mode="hotspot" ssid={hotspot.ssid} password={hotspot.password} />
               ) : (
-                <QRCode mode="lan" url={location.href} />
+                <QRCode mode="lan" url={href} />
               ))}
           </main>
           <footer className={stylex(styles.footer)}>

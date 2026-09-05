@@ -19,6 +19,15 @@ import java.util.Map;
  *       returns 429 without performing the comparison.</li>
  *   <li>{@code GET /api/pin/status} — returns the current rate-limit state
  *       for the requester's IP. Used by the UI to render a countdown.</li>
+ *   <li>{@code GET /api/pin/config} — open to all: {@code {"pinRequired":bool,
+ *       "manageable":bool}}. {@code manageable} is true only for the owner
+ *       (see {@code Server.isOwnerIp}); receivers hide the PIN settings.</li>
+ *   <li>{@code POST /api/pin/configure} — owner-only runtime PIN management.
+ *       Body {@code {"pin":"1234"}} enables (or changes) protection;
+ *       {@code {}} (or {@code {"pin":null}}) disables it. Enabling creates the
+ *       KDF secret when the session has none and re-keys the session: every
+ *       receiver must re-verify. Returns the current secret so the dashboard
+ *       can refresh its URL fragment for QR sharing.</li>
  * </ul>
  *
  * <p>The wire-format shapes are:
@@ -30,6 +39,13 @@ import java.util.Map;
  *   200 → {"locked":bool,
  *          "remaining":int,
  *          "lockoutMsRemaining":long}   (status)
+ *   200 → {"pinRequired":bool,
+ *          "manageable":bool}           (config)
+ *   200 → {"pinRequired":bool,
+ *          "key":string|null}           (configure success; key is base64url)
+ *   400 → {"error":"invalid_pin"}       (configure with a malformed PIN)
+ *   400 → {"error":"invalid_json"}      (configure with an unparsable body)
+ *   403 → {"error":"not_owner"}         (configure from a non-owner IP)
  * </pre>
  */
 public final class PinSecurityRoutes {
@@ -53,6 +69,8 @@ public final class PinSecurityRoutes {
     private void register(Javalin app) {
         app.post("/api/pin/verify", ctx -> handleVerify(ctx));
         app.get("/api/pin/status", ctx -> handleStatus(ctx));
+        app.get("/api/pin/config", ctx -> handleConfig(ctx));
+        app.post("/api/pin/configure", ctx -> handleConfigure(ctx));
     }
 
     void handleVerify(io.javalin.http.Context ctx) throws Exception {
@@ -138,6 +156,57 @@ public final class PinSecurityRoutes {
             "remaining", remainingAttempts,
             "lockoutMsRemaining", 0L
         ));
+    }
+
+    void handleConfig(io.javalin.http.Context ctx) {
+        ctx.status(200).json(Map.of(
+            "pinRequired", server.pinRequired(),
+            "manageable", server.isOwnerIp(ctx.ip())
+        ));
+    }
+
+    void handleConfigure(io.javalin.http.Context ctx) throws Exception {
+        // Owner-only: receivers and LAN scanners must not reconfigure protection.
+        if (!server.isOwnerIp(ctx.ip())) {
+            ctx.status(403).json(Map.of("error", "not_owner"));
+            return;
+        }
+        Map<String, Object> body = parseBody(ctx);
+        if (body == null) {
+            ctx.status(400).json(Map.of("error", "invalid_json"));
+            return;
+        }
+        Object pinRaw = body.get("pin");
+        if (pinRaw == null) {
+            // Disable: the gate and the expected key go away; the KDF secret
+            // stays (same as --encrypt semantics).
+            server.disablePin();
+            ctx.status(200).json(configPayload());
+            return;
+        }
+        if (!(pinRaw instanceof String pin)) {
+            ctx.status(400).json(Map.of("error", "invalid_pin"));
+            return;
+        }
+        // Enable (or change): creates the secret when the session has none,
+        // re-derives the expected key and drops verified keys so every
+        // receiver re-verifies under the new PIN.
+        try {
+            server.enablePin(pin);
+        } catch (IllegalArgumentException e) {
+            ctx.status(400).json(Map.of("error", "invalid_pin"));
+            return;
+        }
+        ctx.status(200).json(configPayload());
+    }
+
+    private Map<String, Object> configPayload() {
+        // LinkedHashMap (not Map.of): the key is null when the session never
+        // held a secret, and Map.of rejects null values.
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("pinRequired", server.pinRequired());
+        m.put("key", server.keyB64Url());
+        return m;
     }
 
     private static Map<String, Object> lockPayload(PinRateLimiter.Result r) {
