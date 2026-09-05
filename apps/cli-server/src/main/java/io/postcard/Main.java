@@ -83,9 +83,9 @@ public final class Main {
         final Runnable quit = () -> { cleanup.run(); System.exit(0); };
 
         if (!opts.headless) {
-            // Closing the dashboard quits postcard, unconditionally. Deliberate: a phone
-            // mid-transfer is not consulted. See
-            // docs/superpowers/specs/2026-09-04-postcard-embedded-browser-design.md.
+            // Closing the dashboard quits postcard, unconditionally. Deliberate, and it has
+            // a cost: a phone mid-transfer is not consulted, so closing the window kills its
+            // download. The simpler rule was chosen over that guarantee.
             var dashboard = io.postcard.desktop.EmbeddedDashboard.create(
                 url,
                 io.postcard.desktop.CefNatives.locate(),

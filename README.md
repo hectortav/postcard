@@ -51,10 +51,6 @@ When a tray icon is available, postcard shows a desktop notification whenever
 downloads stay silent, and `--headless` disables notifications entirely.
 `--headless` also skips the window and never initializes Chromium.
 
-See [`docs/superpowers/specs/2026-09-03-postcard-design.md`](docs/superpowers/specs/2026-09-03-postcard-design.md)
-for the design spec and [`docs/superpowers/plans/2026-09-03-postcard-impl.md`](docs/superpowers/plans/2026-09-03-postcard-impl.md)
-for the implementation plan.
-
 ## Building installers
 
 `apps/cli-server` exposes four `Exec` tasks that wrap the JDK 25 toolchain's
@@ -116,6 +112,5 @@ should go live alongside the installers.
   branch coverage by the `coverage` CI job; the rest of the repo is held
   to 90% (JaCoCo + Vitest thresholds).
 
-See [`docs/superpowers/plans/2026-09-03-postcard-pin-coverage.md`](docs/superpowers/plans/2026-09-03-postcard-pin-coverage.md)
-for the PIN-security design and [`apps/cli-server/src/main/java/io/postcard/security/`](apps/cli-server/src/main/java/io/postcard/security/)
-for the implementation.
+See [`apps/cli-server/src/main/java/io/postcard/security/`](apps/cli-server/src/main/java/io/postcard/security/)
+for the PIN-security implementation.

@@ -4,10 +4,9 @@ name: release
 # this workflow builds the platform-native installers (`.dmg` / `.msi` /
 # `.deb`) and uploads them as release artifacts.
 #
-# The GitHub Pages deploy step is intentionally NOT wired up here yet —
-# the user has asked to defer the public landing-page deploy until the
-# first tag is cut by hand. To enable it later, uncomment the `pages`
-# job below and add a `pages: write` permission at the workflow level.
+# The landing page deploys to GitHub Pages after the installers build, on the
+# same `v*.*.*` tag. Pages must be enabled for the repo with its source set to
+# "GitHub Actions" (Settings -> Pages), or the deploy step fails.
 
 on:
   push:
@@ -80,29 +79,32 @@ jobs:
             apps/cli-server/build/dist/app-image/*
           if-no-files-found: error
 
-  # pages:
-  #   name: deploy-landing-page
-  #   needs: installer
-  #   runs-on: ubuntu-latest
-  #   permissions:
-  #     pages: write
-  #     id-token: write
-  #   environment:
-  #     name: github-pages
-  #     url: ${{ steps.deployment.outputs.page_url }}
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: pnpm/action-setup@v4
-  #       with:
-  #         version: 9.7.0
-  #     - uses: actions/setup-node@v4
-  #       with:
-  #         node-version: 20
-  #     - run: pnpm install --frozen-lockfile
-  #     - run: pnpm --filter @postcard/landing build
-  #     - uses: actions/configure-pages@v5
-  #     - uses: actions/upload-pages-artifact@v3
-  #       with:
-  #         path: apps/landing/dist
-  #     - id: deployment
-  #       uses: actions/deploy-pages@v4
+  pages:
+    name: deploy-landing-page
+    needs: installer
+    runs-on: ubuntu-latest
+    permissions:
+      # Declaring any permission zeroes the rest, so checkout needs contents: read
+      # spelled out here even though it is a default elsewhere.
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @postcard/landing build
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/landing/dist
+      - id: deployment
+        uses: actions/deploy-pages@v4
