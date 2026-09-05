@@ -16,7 +16,7 @@ const FEATURES: readonly Feature[] = [
   },
   {
     title: 'Cross-platform',
-    body: 'macOS, Windows, Linux. One binary per platform, no Electron, no bundled browser.',
+    body: 'macOS, Windows, Linux. One installer per platform, with Chromium bundled for the dashboard window.',
   },
 ];
 

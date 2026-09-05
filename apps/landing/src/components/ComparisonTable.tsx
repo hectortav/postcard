@@ -31,7 +31,7 @@ const ROWS: readonly Row[] = [
   },
   {
     label: 'Executable Footprint',
-    values: ['< 30 MB (Native)', 'OS native', 'Web only', '~80-150 MB'],
+    values: ['~165-220 MB (Chromium bundled)', 'OS native', 'Web only', '~80-150 MB'],
   },
   {
     label: 'Security Layer',
