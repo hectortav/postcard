@@ -61,4 +61,17 @@ describe('fetchLatestRelease', () => {
     });
     await expect(fetchLatestRelease(fetchImpl as unknown as typeof fetch)).rejects.toThrow();
   });
+  it('handles a release that has no assets yet', async () => {
+    // A tag is published before the installer jobs finish uploading, so the API briefly
+    // returns a release with `assets` absent. The download section must render empty rather
+    // than throw.
+    const body = {
+      tag_name: 'v0.1.0',
+      html_url: 'https://github.com/hectortav/postcard/releases/tag/v0.1.0',
+    };
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify(body), { status: 200 }));
+    const r = await fetchLatestRelease(fetchImpl as unknown as typeof fetch);
+    expect(r?.tag).toBe('v0.1.0');
+    expect(r?.assets).toEqual([]);
+  });
 });
