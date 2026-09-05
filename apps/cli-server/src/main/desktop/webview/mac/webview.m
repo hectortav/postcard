@@ -1,23 +1,39 @@
 // System-webview native bridge, macOS leg.
 //
-// Embeds a WKWebView in an AWT Canvas via JAWT and reports back over JNI.
-// Runs entirely on the AWT event thread (which owns the AppKit main thread),
-// so there is no NSApp loop to manage and no -XstartOnFirstThread requirement.
+// Owns a single top-level dashboard window hosting a WKWebView, and parks thread 0
+// in the AppKit event loop on request. No AWT is involved on this side at all.
 //
-// Callbacks into MacWebview.Host, all on the event thread:
+// Ordering constraints (each verified empirically; violating any of them stalls
+// WebKit's launch permanently with no error):
+//   - Nothing AWT may initialize before the first page load completes. The Java side
+//     therefore installs the tray only from onFirstLoad.
+//   - Thread 0 must run a real [NSApp run] loop: AWT's private pumping can sustain a
+//     loaded page but cannot launch one, and manual runMode pumping starves replies.
+//   - The window must be built on thread 0; other threads marshal via runOnMain.
+//
+// Callbacks into MacWebview.Host (all on thread 0):
 //   shouldOpenExternally(url) -> jboolean (caller also opens it externally)
 //   downloadDestination(suggestedName) -> String (absolute path, DownloadTarget-resolved)
 //   onDownloadComplete(fileName) -> void
+//   onWindowClosed() -> void (the X button; Java quits the app)
+//   onFirstLoad() -> void (first main-frame load completed; installs the tray)
 #import <Cocoa/Cocoa.h>
 #import <WebKit/WebKit.h>
 #import <jni.h>
-#import <jawt.h>
-#import <jawt_md.h>
 #import <objc/runtime.h>
 
 #import "io_postcard_desktop_MacWebview.h"
 
 static JavaVM *gJvm;
+static NSWindow *gWin;
+static WKWebView *gWv;
+static jobject gHost;
+static jmethodID gShouldOpenExternally;
+static jmethodID gDownloadDestination;
+static jmethodID gOnDownloadComplete;
+static jmethodID gOnWindowClosed;
+static jmethodID gOnFirstLoad;
+static BOOL gFirstLoadFired = NO;
 
 jint JNI_OnLoad(JavaVM *vm, void *reserved) {
     (void)reserved;
@@ -25,18 +41,29 @@ jint JNI_OnLoad(JavaVM *vm, void *reserved) {
     return JNI_VERSION_1_6;
 }
 
-typedef struct {
-    WKWebView *wv;
-    jobject host;          // global ref to MacWebview.Host
-    jmethodID shouldOpenExternally;
-    jmethodID downloadDestination;
-    jmethodID onDownloadComplete;
-} WebviewHandle;
-
 static JNIEnv *jniEnv(void) {
     JNIEnv *env = NULL;
     (*gJvm)->GetEnv(gJvm, (void **)&env, JNI_VERSION_1_6);
     return env;
+}
+
+// Thread 0 is not a JVM thread (no -XstartOnFirstThread: AWT needs a stock
+// runtime), so any JNI use there must attach first. Thread 0 lives forever,
+// hence attach-once without detach.
+static JNIEnv *attachMain(void) {
+    JNIEnv *env = jniEnv();
+    if (env) return env;
+    if ((*gJvm)->AttachCurrentThread(gJvm, (void **)&env, NULL) != JNI_OK) return NULL;
+    return env;
+}
+
+// Runs the block on thread 0, synchronously. Safe from any thread, including
+// thread 0 itself (dispatch_sync to the main queue from the main thread would
+// deadlock, hence the fast path). Requires thread 0's runloop to be pumping
+// when called off thread — guaranteed once runEventLoop is parked or AWT is up.
+static void runOnMain(void (^block)(void)) {
+    if ([NSThread isMainThread]) block();
+    else dispatch_sync(dispatch_get_main_queue(), block);
 }
 
 static NSString *jstrToNSString(JNIEnv *env, jstring s) {
@@ -52,18 +79,44 @@ static jstring nsStringToJstr(JNIEnv *env, NSString *s) {
 }
 
 @interface PostcardNavDelegate : NSObject <WKNavigationDelegate, WKDownloadDelegate>
-@property (nonatomic) WebviewHandle *h;
 @end
 
 @implementation PostcardNavDelegate
+
+- (void)webView:(WKWebView *)wv didFinishNavigation:(WKNavigation *)nav {
+    (void)nav;
+    NSLog(@"postcard: webview finished loading (%@)", [[wv URL] absoluteString]);
+    if (!gFirstLoadFired) {
+        gFirstLoadFired = YES;
+        JNIEnv *env = jniEnv();
+        (*env)->CallVoidMethod(env, gHost, gOnFirstLoad);
+        if ((*env)->ExceptionCheck(env)) (*env)->ExceptionClear(env);
+    }
+}
+
+- (void)webView:(WKWebView *)wv
+        didFailNavigation:(WKNavigation *)nav
+        withError:(NSError *)error {
+    (void)nav;
+    NSLog(@"postcard: webview navigation failed (%@): %@",
+        [[wv URL] absoluteString], [error localizedDescription]);
+}
+
+- (void)webView:(WKWebView *)wv
+        didFailProvisionalNavigation:(WKNavigation *)nav
+        withError:(NSError *)error {
+    (void)nav;
+    NSLog(@"postcard: webview provisional navigation failed (%@): %@",
+        [[wv URL] absoluteString], [error localizedDescription]);
+}
 
 - (void)webView:(WKWebView *)wv
         decidePolicyForNavigationAction:(WKNavigationAction *)action
         decisionHandler:(void (^)(WKNavigationActionPolicy))handler {
     JNIEnv *env = jniEnv();
     NSString *target = [[[action request] URL] absoluteString] ?: @"";
-    jboolean external = (*env)->CallBooleanMethod(env, self.h->host,
-        self.h->shouldOpenExternally, nsStringToJstr(env, target));
+    jboolean external = (*env)->CallBooleanMethod(env, gHost,
+        gShouldOpenExternally, nsStringToJstr(env, target));
     if ((*env)->ExceptionCheck(env)) (*env)->ExceptionClear(env);
     handler(external ? WKNavigationActionPolicyCancel : WKNavigationActionPolicyAllow);
 }
@@ -79,7 +132,6 @@ static jstring nsStringToJstr(JNIEnv *env, NSString *s) {
 - (void)webView:(WKWebView *)wv
         navigationResponse:(WKNavigationResponse *)response
         didBecomeDownload:(WKDownload *)download {
-    // Remember the suggested name for the completion callback below.
     NSString *name = [[response response] suggestedFilename] ?: @"download";
     objc_setAssociatedObject(download, "postcardName", name,
         OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -95,8 +147,8 @@ static jstring nsStringToJstr(JNIEnv *env, NSString *s) {
     NSString *name = suggestedFilename ?: @"download";
     objc_setAssociatedObject(download, "postcardName", name,
         OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    jstring dest = (*env)->CallObjectMethod(env, self.h->host,
-        self.h->downloadDestination, nsStringToJstr(env, name));
+    jstring dest = (*env)->CallObjectMethod(env, gHost,
+        gDownloadDestination, nsStringToJstr(env, name));
     NSURL *url = nil;
     if (!(*env)->ExceptionCheck(env) && dest) {
         url = [NSURL fileURLWithPath:jstrToNSString(env, dest)];
@@ -109,8 +161,8 @@ static jstring nsStringToJstr(JNIEnv *env, NSString *s) {
 - (void)downloadDidFinish:(WKDownload *)download {
     JNIEnv *env = jniEnv();
     NSString *name = objc_getAssociatedObject(download, "postcardName") ?: @"download";
-    (*env)->CallVoidMethod(env, self.h->host,
-        self.h->onDownloadComplete, nsStringToJstr(env, name));
+    (*env)->CallVoidMethod(env, gHost,
+        gOnDownloadComplete, nsStringToJstr(env, name));
     if ((*env)->ExceptionCheck(env)) (*env)->ExceptionClear(env);
 }
 
@@ -122,84 +174,151 @@ static jstring nsStringToJstr(JNIEnv *env, NSString *s) {
 
 @end
 
+@interface PostcardWindowDelegate : NSObject <NSWindowDelegate>
+@end
+
+@implementation PostcardWindowDelegate
+- (BOOL)windowShouldClose:(NSWindow *)sender {
+    (void)sender;
+    // Closing quits postcard; teardown runs through QuitSequence on the Java side,
+    // which destroys this window via closeWindow.
+    JNIEnv *env = jniEnv();
+    (*env)->CallVoidMethod(env, gHost, gOnWindowClosed);
+    if ((*env)->ExceptionCheck(env)) (*env)->ExceptionClear(env);
+    return YES;
+}
+@end
+
+static void cacheHostMethods(JNIEnv *env, jobject hostGlobal) {
+    // Takes ownership of hostGlobal (a global ref created on the calling thread:
+    // local refs must never cross the dispatch boundary into thread 0).
+    if (gHost) (*env)->DeleteGlobalRef(env, gHost);
+    gHost = hostGlobal;
+    jclass hostCls = (*env)->GetObjectClass(env, hostGlobal);
+    gShouldOpenExternally = (*env)->GetMethodID(env, hostCls,
+        "shouldOpenExternally", "(Ljava/lang/String;)Z");
+    gDownloadDestination = (*env)->GetMethodID(env, hostCls,
+        "downloadDestination", "(Ljava/lang/String;)Ljava/lang/String;");
+    gOnDownloadComplete = (*env)->GetMethodID(env, hostCls,
+        "onDownloadComplete", "(Ljava/lang/String;)V");
+    gOnWindowClosed = (*env)->GetMethodID(env, hostCls,
+        "onWindowClosed", "()V");
+    gOnFirstLoad = (*env)->GetMethodID(env, hostCls,
+        "onFirstLoad", "()V");
+}
+
 /*
  * Class:     io_postcard_desktop_MacWebview
- * Method:    attach
+ * Method:    openWindow
  */
-JNIEXPORT jlong JNICALL Java_io_postcard_desktop_MacWebview_attach(
-        JNIEnv *env, jclass cls, jobject canvas, jstring url, jobject host) {
+JNIEXPORT jlong JNICALL Java_io_postcard_desktop_MacWebview_openWindow(
+        JNIEnv *env, jclass cls, jstring url, jobject host) {
     (void)cls;
+    NSString *nsUrl = jstrToNSString(env, url);
+    // Local refs die with this call and belong to this thread: promote first.
+    // Ownership transfers to gHost on success; freed below on failure.
+    __block jobject hostGlobal = (*env)->NewGlobalRef(env, host);
+    if (!hostGlobal) return 0;
+    __block jlong result = 0;
+    runOnMain(^{
+        if (gWin) {
+            [gWin makeKeyAndOrderFront:nil];
+            [NSApp activateIgnoringOtherApps:YES];
+            result = 1;
+            return;
+        }
+        JNIEnv *e = attachMain();
+        if (!e) {
+            result = 0;
+            return;
+        }
+        cacheHostMethods(e, hostGlobal);
+        hostGlobal = NULL; // ownership transferred to gHost
+        gFirstLoadFired = NO;
 
-    JAWT awt;
-    awt.version = JAWT_VERSION_9;
-    if (JAWT_GetAWT(env, &awt) == JNI_FALSE) return 0;
-
-    JAWT_DrawingSurface *ds = (*awt.GetDrawingSurface)(env, canvas);
-    if (!ds) return 0;
-    if ((*ds->Lock)(ds) & JAWT_LOCK_ERROR) {
-        (*awt.FreeDrawingSurface)(ds);
-        return 0;
-    }
-    JAWT_DrawingSurfaceInfo *dsi = (*ds->GetDrawingSurfaceInfo)(ds);
-    // Since JDK 7 the header no longer names a concrete peer type: platformInfo is
-    // documented only as "an NSObject conforming to JAWT_SurfaceLayers". In practice it
-    // has always been the peer NSView itself (CPlatformView), which is what lets a
-    // webview be added as a subview with the Canvas bounds. The isKindOfClass guard
-    // keeps this honest: if a future JDK changes the implementation, attach fails
-    // gracefully (no window, server keeps running) instead of crashing.
-    NSView *parent = nil;
-    if (dsi && dsi->platformInfo) {
-        NSObject *peer = (__bridge NSObject *)dsi->platformInfo;
-        if ([peer isKindOfClass:[NSView class]]) parent = (NSView *)peer;
-    }
-
-    jlong result = 0;
-    if (parent) {
-        WebviewHandle *h = calloc(1, sizeof(WebviewHandle));
-        h->host = (*env)->NewGlobalRef(env, host);
-        jclass hostCls = (*env)->GetObjectClass(env, host);
-        h->shouldOpenExternally = (*env)->GetMethodID(env, hostCls,
-            "shouldOpenExternally", "(Ljava/lang/String;)Z");
-        h->downloadDestination = (*env)->GetMethodID(env, hostCls,
-            "downloadDestination", "(Ljava/lang/String;)Ljava/lang/String;");
-        h->onDownloadComplete = (*env)->GetMethodID(env, hostCls,
-            "onDownloadComplete", "(Ljava/lang/String;)V");
+        [NSApplication sharedApplication];
+        [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+        NSRect frame = NSMakeRect(0, 0, 1000, 720);
+        gWin = [[NSWindow alloc] initWithContentRect:frame
+            styleMask:(NSWindowStyleMaskTitled | NSWindowStyleMaskClosable |
+                       NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable)
+            backing:NSBackingStoreBuffered defer:NO];
+        [gWin setTitle:@"postcard"];
+        [gWin center];
+        PostcardWindowDelegate *wdel = [[PostcardWindowDelegate alloc] init];
+        [gWin setDelegate:wdel];
+        objc_setAssociatedObject(gWin, "postcardWindowDelegate", wdel,
+            OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 
         WKWebViewConfiguration *cfg = [[WKWebViewConfiguration alloc] init];
-        WKWebView *wv = [[WKWebView alloc] initWithFrame:[parent bounds]
-                                          configuration:cfg];
-        wv.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
-        PostcardNavDelegate *del = [[PostcardNavDelegate alloc] init];
-        del.h = h;
-        wv.navigationDelegate = del;
-        // The delegate must survive as long as the webview; the webview holds
-        // it weakly, so pin it as an associated object of the webview itself.
-        objc_setAssociatedObject(wv, "postcardDelegate", del,
+        gWv = [[WKWebView alloc] initWithFrame:[[gWin contentView] bounds]
+                                 configuration:cfg];
+        [gWv setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
+        PostcardNavDelegate *ndel = [[PostcardNavDelegate alloc] init];
+        [gWv setNavigationDelegate:ndel];
+        objc_setAssociatedObject(gWv, "postcardNavDelegate", ndel,
             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        h->wv = wv;
-        [parent addSubview:wv];
-        [wv loadRequest:[NSURLRequest requestWithURL:
-            [NSURL URLWithString:jstrToNSString(env, url)]]];
-        result = (jlong)(intptr_t)h;
-    }
-
-    (*ds->FreeDrawingSurfaceInfo)(dsi);
-    (*ds->Unlock)(ds);
-    (*awt.FreeDrawingSurface)(ds);
+        [[gWin contentView] addSubview:gWv];
+        [gWin makeKeyAndOrderFront:nil];
+        [NSApp activateIgnoringOtherApps:YES];
+        [gWv loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:nsUrl]]];
+        NSLog(@"postcard: webview window opened (%@)", nsUrl);
+        result = 1;
+    });
+    if (result == 0 && hostGlobal) (*env)->DeleteGlobalRef(env, hostGlobal);
     return result;
 }
 
 /*
  * Class:     io_postcard_desktop_MacWebview
- * Method:    detach
+ * Method:    runEventLoop
  */
-JNIEXPORT void JNICALL Java_io_postcard_desktop_MacWebview_detach(
+JNIEXPORT void JNICALL Java_io_postcard_desktop_MacWebview_runEventLoop(
+        JNIEnv *env, jclass cls) {
+    (void)env; (void)cls;
+    [NSApp run];
+}
+
+/*
+ * Class:     io_postcard_desktop_MacWebview
+ * Method:    stopEventLoop
+ */
+JNIEXPORT void JNICALL Java_io_postcard_desktop_MacWebview_stopEventLoop(
+        JNIEnv *env, jclass cls) {
+    (void)env; (void)cls;
+    // stop: alone only takes effect once the loop wakes; the dummy event makes
+    // Ctrl-C shutdown prompt even when nothing else is queued.
+    [NSApp stop:nil];
+    NSEvent *dummy = [NSEvent otherEventWithType:NSEventTypeApplicationDefined
+        location:NSZeroPoint modifierFlags:0 timestamp:0
+        windowNumber:0 context:nil subtype:0 data1:0 data2:0];
+    [NSApp postEvent:dummy atStart:NO];
+}
+
+/*
+ * Class:     io_postcard_desktop_MacWebview
+ * Method:    closeWindow
+ */
+JNIEXPORT void JNICALL Java_io_postcard_desktop_MacWebview_closeWindow(
         JNIEnv *env, jclass cls, jlong handle) {
-    (void)cls;
-    if (handle == 0) return;
-    WebviewHandle *h = (WebviewHandle *)(intptr_t)handle;
-    [h->wv removeFromSuperview];
-    h->wv = nil;
-    if (h->host) (*env)->DeleteGlobalRef(env, h->host);
-    free(h);
+    (void)env; (void)cls; (void)handle;
+    runOnMain(^{
+        if (gWv) { [gWv removeFromSuperview]; gWv = nil; }
+        if (gWin) { [gWin close]; gWin = nil; }
+        if (gHost) { (*jniEnv())->DeleteGlobalRef(jniEnv(), gHost); gHost = NULL; }
+    });
+}
+
+/*
+ * Class:     io_postcard_desktop_MacWebview
+ * Method:    isVisible
+ */
+JNIEXPORT jboolean JNICALL Java_io_postcard_desktop_MacWebview_isVisible(
+        JNIEnv *env, jclass cls, jlong handle) {
+    (void)env; (void)cls; (void)handle;
+    __block jboolean visible = JNI_FALSE;
+    runOnMain(^{
+        visible = (gWin && [gWin isVisible]) ? JNI_TRUE : JNI_FALSE;
+    });
+    return visible;
 }

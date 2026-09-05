@@ -265,16 +265,23 @@ tasks.register<Exec>("compileWebviewNatives") {
         "-I", jdkHomeDir.resolve("include").absolutePath,
         "-I", jdkHomeDir.resolve("include/darwin").absolutePath,
         "-I", webviewHeaderDir.get().asFile.absolutePath,
-        "-L", jdkHomeDir.resolve("lib").absolutePath,
-        "-ljawt",
         webviewNativeSource.absolutePath,
         "-o", webviewNativesDir.get().asFile.resolve("libpostcard-webview.dylib").absolutePath,
     )
 }
 
 // `run` needs the bridge present in development; on non-mac hosts the task is
-// disabled and this is a no-op.
-tasks.named<JavaExec>("run") { if (isMac) dependsOn("compileWebviewNatives") }
+// disabled and this is a no-op. -XstartOnFirstThread puts main() on thread 0:
+// AppKit windows are built there, thread 0 parks in the AppKit loop, and the
+// native side marshals later calls there. (Dropped once as the suspected cause of
+// a graphics-init wedge; exonerated — the wedge was concurrent first-touch from
+// two threads, which the strictly-solo init order below avoids. Verified green.)
+tasks.named<JavaExec>("run") {
+    if (isMac) {
+        dependsOn("compileWebviewNatives")
+        jvmArgs("-XstartOnFirstThread")
+    }
+}
 
 // JCEF natives for the *host* platform. Downloaded once at build time and bundled into the
 // installer, so the app never needs the network on first run -- postcard is most often
@@ -334,6 +341,8 @@ tasks.register<Exec>("appImage") {
             addAll(listOf("--java-options", "--add-opens=java.desktop/sun.awt=ALL-UNNAMED"))
             addAll(listOf("--java-options", "--add-opens=java.desktop/sun.lwawt=ALL-UNNAMED"))
             addAll(listOf("--java-options", "--add-opens=java.desktop/sun.lwawt.macosx=ALL-UNNAMED"))
+            // Thread 0 for Main.main: window building and event-loop parking.
+            addAll(listOf("--java-options", "-XstartOnFirstThread"))
         }
     })
 }

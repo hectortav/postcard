@@ -32,6 +32,9 @@ public final class Main {
             if (hs != null && hs.interfaceIp() != null) { bind = hs.interfaceIp(); server.setMode("hotspot"); }
             else { System.err.println(hs == null ? "No LAN IPv4 and no usable hotspot." : hs.instructions().text()); System.exit(1); }
         }
+        // PIN management is owner-only (see Server.isOwnerIp): the dashboard call
+        // comes from this same address, receivers from theirs.
+        server.setBindHost(bind.getHostAddress());
         var app = server.build();
         int port = parsePortOrZero(opts.port);
         app.start(bind.getHostAddress(), port);
@@ -52,11 +55,9 @@ public final class Main {
                 pin = opts.pin;
             }
             try {
-                byte[] secret = server.secretBytes();
-                String salt = io.postcard.security.PinSecurityEngine.saltFor(secret);
-                byte[] expected = io.postcard.security.PinSecurityEngine.deriveKey(secret, pin, salt).getEncoded();
-                server.setExpectedDerivedKey(expected);
-                server.setPinRequired(true);
+                // Same path the dashboard's PIN settings use at runtime: validates
+                // the shape, ensures the KDF secret and arms the gate.
+                server.enablePin(pin);
                 url += (url.contains("#") ? "&" : "#") + "pin=" + pin;
                 System.out.println("PIN: " + pin);
             } catch (Exception e) {
@@ -115,17 +116,26 @@ public final class Main {
             // Closing the dashboard quits postcard, unconditionally. Deliberate, and it has
             // a cost: a phone mid-transfer is not consulted, so closing the window kills its
             // download. The simpler rule was chosen over that guarantee.
+            //
             // macOS renders the dashboard in the OS webview; other platforms stay on the
             // embedded Chromium until their native legs land, at which point EmbeddedDashboard
-            // and the whole JCEF bundle go away.
-            var dashboard = isMacOs()
+            // and the whole JCEF bundle go away. macOS with --no-browser also stays on the
+            // lazy JCEF dashboard: its window only ever opens from the tray, long after AWT
+            // is up, which is exactly the order the system webview cannot tolerate.
+            boolean macWindow = isMacOs() && !opts.noBrowser;
+            final String dashboardUrl = url;
+            final java.net.Inet4Address bindAddr = bind;
+            final Runnable installTray = () -> installTray(dashboardUrl, dashboardRef.get(), quit,
+                notify, server, bindAddr);
+            var dashboard = macWindow
                 ? io.postcard.desktop.SystemWebviewDashboard.create(
                     url,
                     io.postcard.desktop.WebviewNatives.locate(),
                     quit,
                     quitSequence::browserTerminated,
                     io.postcard.desktop.DesktopIntegration::browse,
-                    event -> notify.get().accept(event))
+                    event -> notify.get().accept(event),
+                    installTray)
                 : io.postcard.desktop.EmbeddedDashboard.create(
                     url,
                     io.postcard.desktop.CefNatives.locate(),
@@ -135,31 +145,58 @@ public final class Main {
                     event -> notify.get().accept(event));
             dashboardRef.set(dashboard);
 
-            // Nothing is built until open() is called, so --no-browser costs no Chromium.
+            // Nothing is built until open() is called, so --no-browser costs no browser.
             if (!opts.noBrowser) dashboard.open();
+
+            if (!macWindow) installTray.run();
 
             // macOS does not re-run main() when the user clicks the Dock icon of an
             // already-running bundled app; it sends a reopen event instead. Raising our own
             // window is the whole point: this used to exec a second browser every press.
-            io.postcard.desktop.DesktopIntegration.installReopenHandler(url, _ -> dashboard.open());
-
-            // Install the menu-bar / system-tray icon. install() returns
-            // Optional.empty() on platforms without a status-notifier host
-            // (headless Linux, SSH sessions, CI). The desktop integration is
-            // gated behind !opts.headless so GraalVM native builds can stay
-            // AWT-free by passing --headless at run time.
-            java.util.Optional<java.awt.TrayIcon> trayIcon =
-                io.postcard.desktop.SystemTrayController.install(url, dashboard::open, quit);
-            trayIcon.ifPresent(icon -> Runtime.getRuntime().addShutdownHook(new Thread(() ->
-                io.postcard.desktop.SystemTrayController.remove(icon), "postcard-tray-remove")));
-
-            // Announce peer uploads and downloads through the tray. The browser's
-            // Notification API is unavailable here: it requires a secure context and
-            // postcard serves over http on a LAN address.
-            notify.set(io.postcard.desktop.Notifier.forTray(trayIcon));
-            server.setNotifier(event -> notify.get().accept(event), bind.getHostAddress());
+            // (On the system-webview path this installs with the tray, on first load.)
+            if (macWindow) {
+                final Runnable shutdownMac = () -> {
+                    cleanup.run();
+                    try { io.postcard.desktop.MacWebview.stopEventLoop(); } catch (Throwable _) {}
+                };
+                Runtime.getRuntime().addShutdownHook(new Thread(shutdownMac, "postcard-shutdown"));
+                // Park thread 0 in the AppKit loop; the window, WebKit and (later) AWT
+                // all live off it. Ctrl-C unparks via the hook above.
+                io.postcard.desktop.MacWebview.runEventLoop();
+            } else {
+                Runtime.getRuntime().addShutdownHook(new Thread(cleanup, "postcard-shutdown"));
+            }
+        } else {
+            Runtime.getRuntime().addShutdownHook(new Thread(cleanup, "postcard-shutdown"));
         }
-        Runtime.getRuntime().addShutdownHook(new Thread(cleanup, "postcard-shutdown"));
+    }
+
+    /**
+     * Menu-bar icon, Dock-reopen handling and upload/download announcements. On the
+     * system-webview path this runs on first page load (initializing AWT any earlier
+     * wedges WebKit's launch); everywhere else it runs during startup.
+     */
+    private static void installTray(String url, io.postcard.desktop.Dashboard dashboard, Runnable quit,
+            java.util.concurrent.atomic.AtomicReference<
+                java.util.function.Consumer<io.postcard.desktop.Notifier.Event>> notify,
+            io.postcard.server.Server server, java.net.Inet4Address bind) {
+        io.postcard.desktop.DesktopIntegration.installReopenHandler(url, _ -> dashboard.open());
+
+        // Install the menu-bar / system-tray icon. install() returns
+        // Optional.empty() on platforms without a status-notifier host
+        // (headless Linux, SSH sessions, CI). The desktop integration is
+        // gated behind !opts.headless so GraalVM native builds can stay
+        // AWT-free by passing --headless at run time.
+        java.util.Optional<java.awt.TrayIcon> trayIcon =
+            io.postcard.desktop.SystemTrayController.install(url, dashboard::open, quit);
+        trayIcon.ifPresent(icon -> Runtime.getRuntime().addShutdownHook(new Thread(() ->
+            io.postcard.desktop.SystemTrayController.remove(icon), "postcard-tray-remove")));
+
+        // Announce peer uploads and downloads through the tray. The browser's
+        // Notification API is unavailable here: it requires a secure context and
+        // postcard serves over http on a LAN address.
+        notify.set(io.postcard.desktop.Notifier.forTray(trayIcon));
+        server.setNotifier(event -> notify.get().accept(event), bind.getHostAddress());
     }
 
     /** Best-effort recursive delete; depth-first so directories empty before removal. */

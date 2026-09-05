@@ -3,15 +3,10 @@ package io.postcard.desktop;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.swing.JFrame;
-import java.awt.BorderLayout;
-import java.awt.Canvas;
-import java.awt.EventQueue;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 /**
@@ -23,10 +18,12 @@ import java.util.function.Consumer;
  * {@code --no-browser} free of any browser), and a browser that refuses to start must
  * never take down a running file server.
  *
- * <p>Embedding goes through JAWT into a {@link Canvas} inside a {@link JFrame}: AWT
- * already owns the AppKit main thread and pumps its runloop, so unlike a hand-rolled
- * {@code NSApp} loop this needs no {@code -XstartOnFirstThread} and no runloop
- * management of our own (both were spike findings).
+ * <p>The window is built natively as a top-level titled window: modern JDKs no longer
+ * expose the peer NSView through JAWT (so there is nothing to embed into), and a
+ * WKWebView created before AWT has shown a visible window never loads. AWT therefore
+ * stays completely uninitialized until {@link MacWebview.Host#onFirstLoad} fires, at
+ * which point the tray installs itself. The main thread parks in the AppKit event loop
+ * ({@link MacWebview#runEventLoop()}) right after opening.
  *
  * <p>Shutdown needs no Chromium-style grace period — there are no helper processes to
  * reap — so {@code close()} reports termination immediately, exactly like the
@@ -41,18 +38,23 @@ public final class SystemWebviewDashboard implements Dashboard {
     private final Runnable onTerminated;
     private final Consumer<String> externalLinks;
     private final Consumer<Notifier.Event> notify;
+    private final Runnable onFirstLoad;
 
-    private JFrame frame;
     private long handle;
+    private boolean opening;
+    private boolean closed;
+    private final AtomicBoolean trayInstalled = new AtomicBoolean();
 
     private SystemWebviewDashboard(String url, Path nativesDir, Runnable onQuitRequested, Runnable onTerminated,
-                                   Consumer<String> externalLinks, Consumer<Notifier.Event> notify) {
+                                   Consumer<String> externalLinks, Consumer<Notifier.Event> notify,
+                                   Runnable onFirstLoad) {
         this.url = url;
         this.nativesDir = nativesDir;
         this.onQuitRequested = onQuitRequested;
         this.onTerminated = onTerminated;
         this.externalLinks = externalLinks;
         this.notify = notify;
+        this.onFirstLoad = onFirstLoad;
     }
 
     /**
@@ -60,53 +62,28 @@ public final class SystemWebviewDashboard implements Dashboard {
      * @param onTerminated    run when the window is gone and the process is free to end.
      * @param externalLinks   opener for links that would otherwise replace the dashboard.
      * @param notify          channel for "saved X" notifications after a download completes.
+     * @param onFirstLoad     runs once the first page load completes; installs the tray.
      */
     public static Dashboard create(String url, Path nativesDir, Runnable onQuitRequested, Runnable onTerminated,
-                                   Consumer<String> externalLinks, Consumer<Notifier.Event> notify) {
+                                   Consumer<String> externalLinks, Consumer<Notifier.Event> notify,
+                                   Runnable onFirstLoad) {
         Objects.requireNonNull(url, "url");
         Objects.requireNonNull(nativesDir, "nativesDir");
         Objects.requireNonNull(onQuitRequested, "onQuitRequested");
         Objects.requireNonNull(onTerminated, "onTerminated");
         Objects.requireNonNull(externalLinks, "externalLinks");
         Objects.requireNonNull(notify, "notify");
+        Objects.requireNonNull(onFirstLoad, "onFirstLoad");
         return new SystemWebviewDashboard(url, nativesDir, onQuitRequested, onTerminated,
-            externalLinks, notify);
+            externalLinks, notify, onFirstLoad);
     }
 
     @Override
     public synchronized void open() {
-        if (frame != null) {
-            JFrame f = frame;
-            EventQueue.invokeLater(() -> { f.setVisible(true); f.toFront(); f.requestFocus(); });
-            return;
-        }
+        if (handle != 0 || opening || closed) return;
+        opening = true;
         try {
-            build();
-        } catch (Exception | LinkageError e) {
-            // A browser that refuses to start must never take down a running file server: the
-            // URL and QR code are already on stdout, and phones can still reach the server.
-            // LinkageError is caught too — a missing native library must degrade the same way.
-            log.error("postcard: could not start the system webview ({})", e.getMessage(), e);
-        }
-    }
-
-    private void build() throws Exception {
-        MacWebview.ensureLoaded(nativesDir);
-        EventQueue.invokeAndWait(() -> {
-            JFrame f = new JFrame("postcard");
-            f.setIconImage(TrayIconFactory.create(256));
-            Canvas canvas = new Canvas();
-            f.getContentPane().add(canvas, BorderLayout.CENTER);
-            f.setSize(1000, 720);
-            f.setLocationRelativeTo(null);
-            f.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
-            f.addWindowListener(new WindowAdapter() {
-                @Override public void windowClosing(WindowEvent e) {
-                    log.info("postcard: dashboard window closed");
-                    onQuitRequested.run();
-                }
-            });
-            f.setVisible(true); // realizes the Canvas peer, which attach() requires
+            MacWebview.ensureLoaded(nativesDir);
             MacWebview.Host host = new MacWebview.Host() {
                 @Override public boolean shouldOpenExternally(String navUrl) {
                     boolean external =
@@ -123,11 +100,35 @@ public final class SystemWebviewDashboard implements Dashboard {
                 @Override public void onDownloadComplete(String fileName) {
                     notify.accept(Notifier.saved(fileName));
                 }
+
+                @Override public void onWindowClosed() {
+                    log.info("postcard: dashboard window closed");
+                    onQuitRequested.run();
+                }
+
+                @Override public void onFirstLoad() {
+                    // Once-only: didFinish can fire for subframes; tray installs once.
+                    if (trayInstalled.compareAndSet(false, true)) onFirstLoad.run();
+                }
             };
-            handle = MacWebview.attach(canvas, url, host);
-            frame = f;
-            log.info("postcard: system dashboard opening ({})", url);
-        });
+            // Synchronous by design: on thread 0 this runs the native build directly
+            // (no blocking wait for another thread, which deadlocked in an earlier
+            // revision). Off thread 0 the native side marshals and returns.
+            long h = MacWebview.openWindow(url, host);
+            opening = false;
+            if (h == 0) {
+                log.warn("postcard: webview open returned no handle");
+            } else {
+                handle = h;
+                log.info("postcard: system dashboard opening ({})", url);
+            }
+        } catch (Exception | LinkageError e) {
+            // A browser that refuses to start must never take down a running file server: the
+            // URL and QR code are already on stdout, and phones can still reach the server.
+            // LinkageError is caught too — a missing native library must degrade the same way.
+            log.error("postcard: could not start the system webview ({})", e.getMessage(), e);
+            opening = false;
+        }
     }
 
     private static Path downloadsDir() {
@@ -138,24 +139,24 @@ public final class SystemWebviewDashboard implements Dashboard {
 
     @Override
     public synchronized boolean isOpen() {
-        return frame != null && frame.isVisible();
+        if (handle == 0) return false;
+        try {
+            return MacWebview.isVisible(handle);
+        } catch (Exception | LinkageError e) {
+            return false;
+        }
     }
 
     @Override
     public synchronized void close() {
-        if (frame != null) {
-            JFrame f = frame;
-            frame = null;
-            long h = handle;
-            handle = 0;
-            EventQueue.invokeLater(() -> {
-                if (h != 0) {
-                    try { MacWebview.detach(h); } catch (Exception | LinkageError e) {
-                        log.warn("postcard: webview detach failed ({})", e.getMessage());
-                    }
-                }
-                f.dispose();
-            });
+        closed = true;
+        opening = false;
+        long h = handle;
+        handle = 0;
+        if (h != 0) {
+            try { MacWebview.closeWindow(h); } catch (Exception | LinkageError e) {
+                log.warn("postcard: webview close failed ({})", e.getMessage());
+            }
         }
         // No helper processes to reap: termination is immediate.
         onTerminated.run();
