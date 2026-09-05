@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "sentry-spotlight": {
+      "type": "stdio",
+      "command": "pnpm",
+      "args": ["--silent", "exec", "spotlight", "mcp"],
+      "env": {}
+    }
+  }
+}

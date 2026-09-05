@@ -2,5 +2,22 @@
   <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
     <encoder><pattern>%d{HH:mm:ss.SSS} %-5level %logger{30} - %msg%n</pattern></encoder>
   </appender>
-  <root level="INFO"><appender-ref ref="STDOUT" /></root>
+
+  <!--
+    Mirrors WARN/ERROR to a local Spotlight sidecar so that search_errors / search_logs in the
+    sentry-spotlight MCP server can see what the server did. Inert unless POSTCARD_SPOTLIGHT (or
+    -Dpostcard.spotlight) is set: with the switch unset the appender never starts and never opens
+    a socket, so a released binary behaves exactly as it did before. INFO and below stay on stdout
+    only, because postcard logs a line per request and forwarding those buries the failures.
+  -->
+  <appender name="SPOTLIGHT" class="io.postcard.dev.SpotlightAppender">
+    <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+      <level>WARN</level>
+    </filter>
+  </appender>
+
+  <root level="INFO">
+    <appender-ref ref="STDOUT" />
+    <appender-ref ref="SPOTLIGHT" />
+  </root>
 </configuration>

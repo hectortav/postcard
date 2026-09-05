@@ -11,4 +11,12 @@ if (!root) throw new Error('Missing #root element');
 document.body.style.backgroundColor = tokens.colors.paper;
 document.body.style.margin = '0';
 
+// Stream dev-time errors, traces and console warnings to the Spotlight sidecar
+// (see src/dev/spotlight.ts). Vite substitutes `false` for `import.meta.env.DEV`
+// in a production build, so Rollup drops this branch and never emits the chunk
+// — @sentry/browser stays out of the bundle that ships inside the JAR.
+if (import.meta.env.DEV) {
+  void import('./dev/spotlight').then(({ initSpotlight }) => initSpotlight());
+}
+
 render(<App />, root);

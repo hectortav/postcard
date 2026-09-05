@@ -13,13 +13,20 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "e2e": "turbo run e2e",
+    "spotlight": "spotlight",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md}\""
   },
   "devDependencies": {
+    "@spotlightjs/spotlight": "^4.11.8",
     "oxlint": "^1.81.0",
     "prettier": "^3.9.6",
     "turbo": "^2.10.12",
     "typescript": "^7.0.2"
+  },
+  "pnpm": {
+    "overrides": {
+      "hono": "4.12.31"
+    }
   }
 }

@@ -24,8 +24,14 @@ dependencies {
     implementation(libs.slf4j.api)
     implementation(libs.jackson.databind)
     implementation(libs.jcefmaven)
+    // Compile-only: io.postcard.dev.SpotlightAppender extends logback's AppenderBase. Logback
+    // stays a runtime dependency for everything else, so this adds nothing to the shipped JAR.
+    compileOnly(libs.logback.classic)
     runtimeOnly(libs.logback.classic)
 
+    // SpotlightAppenderTest touches resolveEndpoint on a class that extends AppenderBase, so the
+    // test compiler needs logback too; `compileOnly` does not propagate to the test classpath.
+    testCompileOnly(libs.logback.classic)
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.mockito.core)
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
@@ -36,6 +42,12 @@ application { mainClass.set("io.postcard.Main") }
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
     testLogging { events("passed", "skipped", "failed") }
+    // `./gradlew test -Ppostcard.spotlight=1` streams WARN/ERROR from a test run into the local
+    // Spotlight sidecar. This goes through a Gradle property rather than reading POSTCARD_SPOTLIGHT
+    // from the environment because test workers inherit the *daemon's* environment, not the
+    // invoking shell's -- so `POSTCARD_SPOTLIGHT=1 ./gradlew test` silently does nothing whenever a
+    // daemon is already warm, which is almost always.
+    (findProperty("postcard.spotlight") as String?)?.let { systemProperty("postcard.spotlight", it) }
 }
 
 tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJar") {
@@ -69,6 +81,11 @@ tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJ
 val coverageExclusions = listOf(
     "io/postcard/desktop/EmbeddedDashboard*",
     "io/postcard/tools/**",
+    // Dev-only, and a thin shell over HttpClient in exactly the sense above: the envelope format
+    // (SpotlightEnvelope) and the opt-in rule (SpotlightAppender.resolveEndpoint) are pure and
+    // fully covered; what is excluded is the socket and logback's start()/append() plumbing,
+    // which cannot be exercised without a live sidecar on :8969.
+    "io/postcard/dev/SpotlightAppender*",
 )
 
 tasks.withType<JacocoReportBase>().configureEach {
