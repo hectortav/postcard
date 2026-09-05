@@ -80,6 +80,11 @@ tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJ
 // gate honest rather than lowering the threshold to accommodate them.
 val coverageExclusions = listOf(
     "io/postcard/desktop/EmbeddedDashboard*",
+    // Same thin-shell rationale as EmbeddedDashboard: SystemWebviewDashboard and MacWebview
+    // need a display and a native library, so they cannot run in CI. The decidable rules
+    // they delegate to (WebviewPolicy, WebviewNatives, DownloadTarget) are pure and covered.
+    "io/postcard/desktop/SystemWebviewDashboard*",
+    "io/postcard/desktop/MacWebview*",
     "io/postcard/tools/**",
     // Dev-only, and a thin shell over HttpClient in exactly the sense above: the envelope format
     // (SpotlightEnvelope) and the opt-in rule (SpotlightAppender.resolveEndpoint) are pure and
@@ -200,6 +205,77 @@ val iconFile: java.io.File = layout.projectDirectory
 val appVersion: String =
     if (version.toString().startsWith("0.")) "1.0" else version.toString()
 
+// ---------------------------------------------------------------------------
+// System-webview native bridge (macOS leg).
+//
+// Compiles src/main/desktop/webview/mac/webview.m (JAWT embedding of WKWebView)
+// into build/webview-natives/libpostcard-webview.dylib, where WebviewNatives.locate()
+// finds it in development. The packaged case is covered below in jpackageInput.
+// Windows (WebView2) and Linux (WebKitGTK) legs follow the same shape.
+// ---------------------------------------------------------------------------
+
+val webviewNativesDir = layout.buildDirectory.dir("webview-natives")
+val webviewHeaderDir = layout.buildDirectory.dir("generated/webview-headers")
+val webviewHeaderClassesDir = layout.buildDirectory.dir("tmp/webview-header-classes")
+
+val jdkBinDir: java.io.File = javaToolchains
+    .launcherFor { languageVersion.set(JavaLanguageVersion.of(25)) }
+    .get()
+    .executablePath
+    .asFile
+    .parentFile
+val jdkHomeDir: java.io.File = jdkBinDir.parentFile
+val macWebviewJava = layout.projectDirectory
+    .file("src/main/java/io/postcard/desktop/MacWebview.java").asFile
+val webviewNativeSource = layout.projectDirectory
+    .file("src/main/desktop/webview/mac/webview.m").asFile
+
+tasks.register<Exec>("genWebviewHeaders") {
+    group = "build"
+    description = "Generate the JNI header for the macOS system-webview bridge"
+    enabled = isMac
+    inputs.file(macWebviewJava)
+    outputs.dir(webviewHeaderDir)
+    outputs.dir(webviewHeaderClassesDir)
+    doFirst {
+        webviewHeaderDir.get().asFile.mkdirs()
+        webviewHeaderClassesDir.get().asFile.mkdirs()
+    }
+    commandLine(
+        jdkBinDir.resolve("javac").absolutePath,
+        "-h", webviewHeaderDir.get().asFile.absolutePath,
+        "-d", webviewHeaderClassesDir.get().asFile.absolutePath,
+        macWebviewJava.absolutePath,
+    )
+}
+
+tasks.register<Exec>("compileWebviewNatives") {
+    group = "build"
+    description = "Compile the macOS system-webview bridge (disabled on other hosts)"
+    enabled = isMac
+    dependsOn("genWebviewHeaders")
+    inputs.file(webviewNativeSource)
+    inputs.dir(webviewHeaderDir)
+    outputs.dir(webviewNativesDir)
+    doFirst { webviewNativesDir.get().asFile.mkdirs() }
+    commandLine(
+        "clang",
+        "-dynamiclib", "-fobjc-arc",
+        "-framework", "Cocoa", "-framework", "WebKit",
+        "-I", jdkHomeDir.resolve("include").absolutePath,
+        "-I", jdkHomeDir.resolve("include/darwin").absolutePath,
+        "-I", webviewHeaderDir.get().asFile.absolutePath,
+        "-L", jdkHomeDir.resolve("lib").absolutePath,
+        "-ljawt",
+        webviewNativeSource.absolutePath,
+        "-o", webviewNativesDir.get().asFile.resolve("libpostcard-webview.dylib").absolutePath,
+    )
+}
+
+// `run` needs the bridge present in development; on non-mac hosts the task is
+// disabled and this is a no-op.
+tasks.named<JavaExec>("run") { if (isMac) dependsOn("compileWebviewNatives") }
+
 // JCEF natives for the *host* platform. Downloaded once at build time and bundled into the
 // installer, so the app never needs the network on first run -- postcard is most often
 // reached for offline, on a LAN.
@@ -221,9 +297,12 @@ val jpackageInputDir = layout.buildDirectory.dir("jpackage-input")
 
 tasks.register<Sync>("jpackageInput") {
     dependsOn("shadowJar", "installCefNatives")
+    if (isMac) dependsOn("compileWebviewNatives")
     into(jpackageInputDir)
     from(shadowJarFile)
     from(cefBundleDir) { into("jcef-bundle") }
+    // System-webview bridge beside the jar, where WebviewNatives.locate() looks.
+    if (isMac) from(webviewNativesDir) { into("webview-natives") }
 }
 
 tasks.register<Exec>("appImage") {

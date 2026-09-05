@@ -115,13 +115,24 @@ public final class Main {
             // Closing the dashboard quits postcard, unconditionally. Deliberate, and it has
             // a cost: a phone mid-transfer is not consulted, so closing the window kills its
             // download. The simpler rule was chosen over that guarantee.
-            var dashboard = io.postcard.desktop.EmbeddedDashboard.create(
-                url,
-                io.postcard.desktop.CefNatives.locate(),
-                quit,
-                quitSequence::browserTerminated,
-                io.postcard.desktop.DesktopIntegration::browse,
-                event -> notify.get().accept(event));
+            // macOS renders the dashboard in the OS webview; other platforms stay on the
+            // embedded Chromium until their native legs land, at which point EmbeddedDashboard
+            // and the whole JCEF bundle go away.
+            var dashboard = isMacOs()
+                ? io.postcard.desktop.SystemWebviewDashboard.create(
+                    url,
+                    io.postcard.desktop.WebviewNatives.locate(),
+                    quit,
+                    quitSequence::browserTerminated,
+                    io.postcard.desktop.DesktopIntegration::browse,
+                    event -> notify.get().accept(event))
+                : io.postcard.desktop.EmbeddedDashboard.create(
+                    url,
+                    io.postcard.desktop.CefNatives.locate(),
+                    quit,
+                    quitSequence::browserTerminated,
+                    io.postcard.desktop.DesktopIntegration::browse,
+                    event -> notify.get().accept(event));
             dashboardRef.set(dashboard);
 
             // Nothing is built until open() is called, so --no-browser costs no Chromium.
@@ -160,4 +171,6 @@ public final class Main {
     }
 
     private static int parsePortOrZero(String p) { return p.equalsIgnoreCase("auto") ? 0 : Integer.parseInt(p); }
+
+    private static boolean isMacOs() { return System.getProperty("os.name", "").startsWith("Mac OS X"); }
 }
