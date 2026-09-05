@@ -35,7 +35,7 @@ describe('App', () => {
     const comparisonSection = document.querySelector('section[aria-labelledby="comparison-heading"]') as HTMLElement;
     expect(within(comparisonSection).getByText('How it compares')).toBeTruthy();
     // Terminal
-    expect(screen.getByText(/npx -y postcard/)).toBeTruthy();
+    expect(screen.getByText(/postcard --path/)).toBeTruthy();
     // Download (will settle into "Coming soon" given 404)
     await waitFor(() => expect(screen.getByText(/coming soon/i)).toBeTruthy());
     // Footer (anchored to the index-zr0 repo URL so it doesn't collide

@@ -26,7 +26,7 @@ test('landing page renders all sections and airmail stripe', async ({ page }) =>
   await expect(page.getByText('Cross-platform')).toBeVisible();
 
   // Terminal block.
-  await expect(page.getByText(/npx -y postcard/)).toBeVisible();
+  await expect(page.getByText(/postcard --path/)).toBeVisible();
 
   // Download section: either three buttons (release exists) or
   // "Coming soon" + a GitHub releases link (no release).

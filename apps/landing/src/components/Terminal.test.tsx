@@ -3,18 +3,17 @@ import { render } from '@testing-library/preact';
 import { Terminal } from './Terminal';
 
 describe('Terminal', () => {
-  it('renders the canonical npx command', () => {
+  it('renders the canonical postcard command', () => {
     const { container } = render(<Terminal />);
     const pre = container.querySelector('pre');
-    expect(pre?.textContent).toContain('npx -y postcard');
-    expect(pre?.textContent).toContain('~/Desktop/photo.jpg');
+    expect(pre?.textContent).toContain('postcard --path ~/Desktop');
   });
 
-  it('renders a $ prompt and a bind-url follow-up line', () => {
+  it('renders a $ prompt and a BIND follow-up line', () => {
     const { container } = render(<Terminal />);
     const pre = container.querySelector('pre');
     expect(pre?.textContent).toContain('$');
-    expect(pre?.textContent).toMatch(/listening on http:\/\//);
+    expect(pre?.textContent).toMatch(/BIND http:\/\//);
   });
 
   it('uses monospace font on the code block', () => {

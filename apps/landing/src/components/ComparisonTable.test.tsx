@@ -60,13 +60,13 @@ describe('ComparisonTable', () => {
       expect(offlineRow.textContent).toMatch(/✓ Yes/);
     });
 
-    it('renders the "Executable Footprint" postcard value "< 30 MB (Native)"', () => {
+    it('renders the "Executable Footprint" postcard value "~165-220 MB (Chromium bundled)"', () => {
       setViewport(1280);
       render(<ComparisonTable />);
       const section = getSection();
       const row = within(section).getByText('Executable Footprint')
         .parentElement as HTMLElement;
-      expect(row.textContent).toMatch(/< 30 MB \(Native\)/);
+      expect(row.textContent).toMatch(/~165-220 MB \(Chromium bundled\)/);
     });
 
     it('renders the "Security Layer" postcard value "AES-256-GCM + PIN"', () => {
