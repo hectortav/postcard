@@ -79,9 +79,38 @@ jobs:
             apps/cli-server/build/dist/app-image/*
           if-no-files-found: error
 
+  # Publish the installers as an actual GitHub Release. Without this the workflow only
+  # produced run-scoped artifacts: the Releases page stayed empty, and the landing page's
+  # /releases/latest lookup 404'd forever, so it showed "Coming soon" no matter how many
+  # tags were cut.
+  publish:
+    name: publish-release
+    needs: installer
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: postcard-installer-*
+          merge-multiple: true
+
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Not a draft and not a prerelease: /releases/latest, which the landing page
+          # queries, skips both.
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "postcard $GITHUB_REF_NAME" \
+            --generate-notes \
+            artifacts/installer/*
+
   pages:
     name: deploy-landing-page
-    needs: installer
+    needs: publish
     runs-on: ubuntu-latest
     permissions:
       # Declaring any permission zeroes the rest, so checkout needs contents: read
