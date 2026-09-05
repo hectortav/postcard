@@ -91,6 +91,55 @@ deploy step is scaffolded (commented out) at the bottom of the file —
 uncomment it when the first hand-cut tag is ready and the landing page
 should go live alongside the installers.
 
+## Debugging with Spotlight
+
+[Spotlight](https://spotlightjs.com) is Sentry's local-only debugger: a sidecar on `:8969` that
+collects errors, logs and traces from both halves of postcard and shows them in one place. Nothing
+leaves the machine and no DSN exists anywhere in the tree, so it fits the same "no cloud" rule as
+the rest of the app.
+
+```bash
+pnpm spotlight        # sidecar + UI on http://localhost:8969
+```
+
+**Browser.** `pnpm --filter @postcard/web dev` wires itself up automatically. The Sentry browser SDK
+is a devDependency, initialised from `apps/web/src/dev/spotlight.ts` behind an
+`import.meta.env.DEV` guard that Vite compiles to `false` in a production build — so Rollup drops
+the branch and the chunk, and the bundle embedded in the JAR contains none of it. That is enforced,
+not assumed: `pnpm --filter @postcard/web build` runs `scripts/assert-no-sentry-in-bundle.mjs`
+against the emitted files and fails the build if any of it leaks (an unguarded import takes the
+bundle from 55 kB to 203 kB, which is the regression the check exists to catch).
+
+**Server.** Off by default and opt-in per run — the released binary never opens the socket:
+
+```bash
+POSTCARD_SPOTLIGHT=1 java -jar build/libs/postcard-cli-server-0.1.0-all.jar
+./gradlew test -Ppostcard.spotlight=1      # test-run failures, same place
+```
+
+`POSTCARD_SPOTLIGHT` takes `1`/`true`/`yes`/`on`, or a full URL to point at a sidecar elsewhere;
+anything else (including an empty value) means off. Delivery is async and best-effort, and gives up
+after five consecutive failures, so a missing sidecar can never slow down or break a transfer.
+
+postcard does **not** depend on sentry-java. `io.postcard.dev.SpotlightEnvelope` writes the Sentry
+envelope format directly using the Jackson dependency that was already there — a telemetry SDK
+inside the shipped JAR is a bigger promise to keep than dev-time debugging is worth. Reporting is
+attached as a logback appender rather than a Javalin exception handler, which keeps it purely
+additive: response codes and console output are unchanged, and anything the server already logs at
+WARN or above is picked up, including the WebSocket and tray paths that never touch a route.
+
+**Agents.** [`.mcp.json`](.mcp.json) registers the `sentry-spotlight` MCP server, giving Claude Code
+`search_errors`, `search_logs`, `search_traces` and `get_traces` against the same buffer — so "what
+just failed?" is answerable without pasting a stack trace.
+
+> **Version pin.** The root `package.json` pins `hono` to `4.12.31` via `pnpm.overrides`. Spotlight
+> 4.11.8's request middleware calls `ctx.req.query().toString()`, and hono `4.12.34+` changed
+> `query()` to return a null-prototype object, which has no `toString`. The mismatch makes *every*
+> sidecar route return 500 — the UI, envelope ingest and the MCP endpoint alike — while the process
+> still looks healthy in `ps`. The MCP server is launched through `pnpm exec` rather than
+> `npx @spotlightjs/spotlight@latest` for the same reason: npx resolves its own unpinned tree and
+> would reintroduce the broken pairing. Revisit when Spotlight releases a fix.
+
 ## Security
 
 - **Encryption** (`--encrypt` / `--pin`): AES-256-GCM, 12-byte nonce + 16-byte
