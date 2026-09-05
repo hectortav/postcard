@@ -129,6 +129,10 @@ class SystemTrayControllerTest {
     }
 
     @Test void openDashboardMenuItemDelegatesToTheDashboard() {
+        // Same environment assumption as buildIconPopulatesMenuAndListeners: constructing a
+        // real TrayIcon throws HeadlessException on a headless CI runner.
+        assumeTrue(SystemTray.isSupported(), "SystemTray not available in this environment");
+
         // The tray used to launch a browser itself. It now knows only that *something* shows
         // the dashboard, which is what lets Main swap the implementation.
         var dashboard = new FakeDashboard();

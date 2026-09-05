@@ -61,6 +61,22 @@ tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJ
 // dead; excluding it is the JaCoCo-native way to express "tested by the
 // JRE spec, not by JUnit."
 // ---------------------------------------------------------------------------
+// Excluded from coverage: thin shells over the windowing and native layers. EmbeddedDashboard
+// cannot be exercised without a display and a 300MB Chromium download, and tools/ only runs at
+// build time. Everything decidable in them was deliberately pushed out into CefNatives and
+// DownloadTarget, which are pure functions and fully covered -- excluding the shells keeps the
+// gate honest rather than lowering the threshold to accommodate them.
+val coverageExclusions = listOf(
+    "io/postcard/desktop/EmbeddedDashboard*",
+    "io/postcard/tools/**",
+)
+
+tasks.withType<JacocoReportBase>().configureEach {
+    classDirectories.setFrom(
+        files(classDirectories.files.map { fileTree(it) { exclude(coverageExclusions) } })
+    )
+}
+
 tasks.jacocoTestReport {
     dependsOn(tasks.test)
     reports {
