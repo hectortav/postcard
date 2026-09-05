@@ -46,7 +46,8 @@ public final class EmbeddedDashboard implements Dashboard {
 
     private final String url;
     private final Path nativesDir;
-    private final Runnable onWindowClosed;
+    private final Runnable onQuitRequested;
+    private final Runnable onTerminated;
     private final Consumer<String> externalLinks;
     private final Consumer<Notifier.Event> notify;
 
@@ -54,29 +55,33 @@ public final class EmbeddedDashboard implements Dashboard {
     private CefClient client;
     private JFrame frame;
 
-    private EmbeddedDashboard(String url, Path nativesDir, Runnable onWindowClosed,
+    private EmbeddedDashboard(String url, Path nativesDir, Runnable onQuitRequested, Runnable onTerminated,
                               Consumer<String> externalLinks, Consumer<Notifier.Event> notify) {
         this.url = url;
         this.nativesDir = nativesDir;
-        this.onWindowClosed = onWindowClosed;
+        this.onQuitRequested = onQuitRequested;
+        this.onTerminated = onTerminated;
         this.externalLinks = externalLinks;
         this.notify = notify;
     }
 
     /**
-     * @param onWindowClosed run when the user closes the window. postcard passes its shutdown
-     *                       sequence here: closing the dashboard quits.
-     * @param externalLinks  opener for links that would otherwise replace the dashboard
-     * @param notify         channel for "saved X" notifications after a download completes
+     * @param onQuitRequested run when the user asks postcard to quit, either by closing the
+     *                        window or through Cmd+Q. Closing the dashboard quits.
+     * @param onTerminated    run when Chromium has finished shutting down and the process is
+     *                        free to end. Nothing else may end it: see {@link QuitSequence}.
+     * @param externalLinks   opener for links that would otherwise replace the dashboard
+     * @param notify          channel for "saved X" notifications after a download completes
      */
-    public static Dashboard create(String url, Path nativesDir, Runnable onWindowClosed,
+    public static Dashboard create(String url, Path nativesDir, Runnable onQuitRequested, Runnable onTerminated,
                                    Consumer<String> externalLinks, Consumer<Notifier.Event> notify) {
         Objects.requireNonNull(url, "url");
         Objects.requireNonNull(nativesDir, "nativesDir");
-        Objects.requireNonNull(onWindowClosed, "onWindowClosed");
+        Objects.requireNonNull(onQuitRequested, "onQuitRequested");
+        Objects.requireNonNull(onTerminated, "onTerminated");
         Objects.requireNonNull(externalLinks, "externalLinks");
         Objects.requireNonNull(notify, "notify");
-        return new EmbeddedDashboard(url, nativesDir, onWindowClosed, externalLinks, notify);
+        return new EmbeddedDashboard(url, nativesDir, onQuitRequested, onTerminated, externalLinks, notify);
     }
 
     @Override
@@ -100,7 +105,28 @@ public final class EmbeddedDashboard implements Dashboard {
         builder.setInstallDir(nativesDir.toFile());
         builder.setSkipInstallation(true);                              // natives are bundled
         builder.getCefSettings().windowless_rendering_enabled = false;  // windowed: native drag-and-drop
-        builder.setAppHandler(new MavenCefAppHandlerAdapter() {});      // never CefApp.addAppHandler
+        builder.setAppHandler(new MavenCefAppHandlerAdapter() {         // never CefApp.addAppHandler
+            /**
+             * Cmd+Q, the Dock's Quit and a SIGTERM all arrive here rather than through the
+             * window listener. Returning true claims the request: CefApp would otherwise
+             * dispose itself behind our back, tearing down the browser while the file server
+             * kept running and leaving nothing able to end the process.
+             */
+            @Override public boolean onBeforeTerminate() {
+                onQuitRequested.run();
+                return true;
+            }
+
+            /**
+             * The only signal that Chromium has finished and its helper processes are reaped.
+             * Ending the JVM before this orphans them; not ending it at all leaves a windowless
+             * process no one can quit.
+             */
+            @Override public void stateHasChanged(CefApp.CefAppState state) {
+                super.stateHasChanged(state);
+                if (state == CefApp.CefAppState.TERMINATED) onTerminated.run();
+            }
+        });
 
         cefApp = builder.build();
         client = cefApp.createClient();
@@ -119,7 +145,7 @@ public final class EmbeddedDashboard implements Dashboard {
             f.addWindowListener(new WindowAdapter() {
                 @Override public void windowClosing(WindowEvent e) {
                     log.info("postcard: dashboard window closed");
-                    onWindowClosed.run();
+                    onQuitRequested.run();
                 }
             });
             f.setVisible(true);
@@ -171,6 +197,12 @@ public final class EmbeddedDashboard implements Dashboard {
         return frame != null && frame.isVisible();
     }
 
+    /**
+     * Asks Chromium to shut down and returns before it has. Disposing a {@link CefApp} only
+     * schedules the teardown; it completes over several turns of the event thread, and reports
+     * itself through the {@code onTerminated} callback. Blocking here would deadlock — the
+     * thread we would block is the one CEF needs in order to finish.
+     */
     @Override
     public synchronized void close() {
         if (frame != null) {
@@ -179,7 +211,14 @@ public final class EmbeddedDashboard implements Dashboard {
             EventQueue.invokeLater(f::dispose);
         }
         if (client != null) { client.dispose(); client = null; }
-        if (cefApp != null) { cefApp.dispose(); cefApp = null; }
-        log.info("postcard: embedded dashboard disposed");
+        if (cefApp != null) {
+            cefApp.dispose();
+            cefApp = null;
+            log.info("postcard: embedded dashboard shutting down");
+        } else {
+            // --no-browser, or a Chromium that never started: there is nothing to wait for,
+            // and waiting anyway would stall every quit by the full grace period.
+            onTerminated.run();
+        }
     }
 }

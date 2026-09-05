@@ -10,6 +10,14 @@ import picocli.CommandLine;
 import java.net.Inet4Address;
 
 public final class Main {
+    /**
+     * How long Chromium gets to shut down before postcard leaves without it. Comfortably over
+     * the teardown's own worst case (a 3s drain plus a 1s forced close) so the deadline only
+     * ever fires for a browser that is genuinely stuck, and short enough that a stuck one still
+     * feels like quitting rather than hanging.
+     */
+    private static final long QUIT_GRACE_MILLIS = 5_000;
+
     public static void main(String[] args) throws Exception {
         var log = org.slf4j.LoggerFactory.getLogger(Main.class);
         var opts = new PostcardOptions();
@@ -60,29 +68,50 @@ public final class Main {
         if (opts.authToken != null) url += (url.contains("?") ? "&" : "?") + "token=" + opts.authToken;
         System.out.println("BIND " + url);
         System.out.println(io.postcard.qr.QrRenderer.ansi(url));
-        // One shutdown sequence, three callers: the tray's Quit item, the dashboard window's
-        // close button, and the JVM shutdown hook. `cleanup` is safe inside a shutdown hook
-        // (no System.exit); `quit` is the user-initiated variant that also exits.
-        //
-        // The dashboard is reached through a reference because the shutdown runnables are built
-        // before it: the window's close button needs `quit`, and `cleanup` needs to dispose
-        // CEF. Same reason for the notifier, which only exists once the tray is installed.
+        // The dashboard is reached through a reference because the shutdown wiring is built
+        // before it: the window's close button needs the quit sequence, and the quit sequence
+        // needs to stop the browser. Same reason for the notifier, which only exists once the
+        // tray is installed.
         final var dashboardRef = new java.util.concurrent.atomic.AtomicReference<io.postcard.desktop.Dashboard>();
         final var notify = new java.util.concurrent.atomic.AtomicReference<
             java.util.function.Consumer<io.postcard.desktop.Notifier.Event>>(
                 io.postcard.desktop.Notifier.sink(_ -> {}));
 
+        // Server-side teardown. Idempotent because it has two callers that can both fire on the
+        // way out: the quit sequence, and the JVM shutdown hook that covers Ctrl-C and headless
+        // runs. It never calls System.exit — only the quit sequence decides when the JVM dies.
+        final var tornDown = new java.util.concurrent.atomic.AtomicBoolean();
         final Runnable cleanup = () -> {
-            var d = dashboardRef.get();
-            if (d != null) d.close();                                  // stop Chromium first
+            if (!tornDown.compareAndSet(false, true)) return;
             try { app.jettyServer().stop(); } catch (Exception _) {}   // stop accepting connections
-            Shutdown.drain(3, () -> {}, () -> server.hub().close());          // drain in-flight, close hub
+            Shutdown.drain(3, () -> {}, () -> server.hub().close());   // drain in-flight, close hub
             if (server.tempDir()) deleteTree(server.store().dir());
             log.info("postcard: goodbye");
         };
-        final Runnable quit = () -> { cleanup.run(); System.exit(0); };
 
         if (!opts.headless) {
+            // Quitting is a two-party affair once Chromium is in the process: the JVM may not
+            // exit until CEF says it is done, or its helper processes are orphaned and crash.
+            // Teardown runs on its own thread because the event thread is the one CEF shuts
+            // down on, and the deadline is a daemon thread for the same reason — a wedged
+            // event thread must not be able to hold the app open.
+            final var quitSequence = io.postcard.desktop.QuitSequence.create(
+                task -> new Thread(task, "postcard-quit").start(),
+                cleanup,
+                () -> { var d = dashboardRef.get(); if (d != null) d.close(); },
+                (millis, action) -> {
+                    var timer = new Thread(() -> {
+                        try { Thread.sleep(millis); } catch (InterruptedException _) { return; }
+                        log.warn("postcard: quit is taking longer than {}ms; leaving now", millis);
+                        action.run();
+                    }, "postcard-quit-deadline");
+                    timer.setDaemon(true);
+                    timer.start();
+                },
+                QUIT_GRACE_MILLIS,
+                () -> System.exit(0));
+            final Runnable quit = quitSequence::request;
+
             // Closing the dashboard quits postcard, unconditionally. Deliberate, and it has
             // a cost: a phone mid-transfer is not consulted, so closing the window kills its
             // download. The simpler rule was chosen over that guarantee.
@@ -90,6 +119,7 @@ public final class Main {
                 url,
                 io.postcard.desktop.CefNatives.locate(),
                 quit,
+                quitSequence::browserTerminated,
                 io.postcard.desktop.DesktopIntegration::browse,
                 event -> notify.get().accept(event));
             dashboardRef.set(dashboard);
