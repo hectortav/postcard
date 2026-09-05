@@ -1,0 +1,411 @@
+name: build
+
+on: [push, pull_request]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run lint
+
+  typecheck:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run typecheck
+
+  unit-test:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run build
+      - run: pnpm turbo run test
+      - uses: actions/cache@v4
+        with:
+          path: ~/.gradle
+          key: gradle-${{ runner.os }}-${{ hashFiles('apps/cli-server/**/*.kts', 'apps/cli-server/gradle/libs.versions.toml') }}
+      - run: cd apps/cli-server && ./gradlew test
+
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run build
+      - name: JaCoCo coverage gate (cli-server)
+        run: cd apps/cli-server && ./gradlew test jacocoTestReport jacocoTestCoverageVerification
+      - name: Vitest coverage gate (@sendme/web)
+        run: pnpm --filter @sendme/web test:coverage
+      - name: Vitest coverage gate (@sendme/landing)
+        run: pnpm --filter @sendme/landing test:coverage
+      - name: Upload coverage HTML reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sendme-coverage-html
+          path: |
+            apps/cli-server/build/reports/jacoco/test/html
+            apps/web/coverage
+            apps/landing/coverage
+
+  e2e:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('apps/cli-server/**/*.kts', 'apps/cli-server/gradle/libs.versions.toml') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run build
+      - name: Boot server and capture BIND line
+        run: |
+          cd apps/cli-server
+          stdbuf -oL -eL ./gradlew run --args="--port auto --path /tmp/sendme-e2e --no-browser" > /tmp/sendme.out 2>&1 &
+          SERVER_PID=$!
+          for i in {1..240}; do
+            if grep -q '^BIND ' /tmp/sendme.out 2>/dev/null; then break; fi
+            sleep 1
+          done
+          URL=$(grep -E '^BIND ' /tmp/sendme.out | head -1 | sed -E 's/^BIND //')
+          if [ -z "$URL" ]; then
+            echo "::error::Server did not print a BIND line within 240s"
+            cat /tmp/sendme.out
+            kill $SERVER_PID || true
+            exit 1
+          fi
+          echo "Server BIND: $URL"
+          echo "SENDME_E2E_URL=$URL" >> $GITHUB_ENV
+      - run: pnpm --filter @sendme/web exec playwright install --with-deps chromium webkit
+      # Only run the baseline specs here: clipboard, host-and-mobile,
+      # range-download. The pin-* and encrypted specs need a server
+      # started with --pin / --encrypt and live in their own dedicated
+      # jobs (e2e-pin, e2e-pin-rate-limit, e2e-encrypted).
+      - run: pnpm --filter @sendme/web e2e --grep "clipboard|host-and-mobile|range-download"
+      - name: Teardown
+        if: always()
+        run: |
+          pkill -f 'gradle' 2>/dev/null || true
+          pkill -f 'GradleDaemon' 2>/dev/null || true
+          pkill -f 'sendme-cli-server' 2>/dev/null || true
+
+  e2e-encrypted:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-e2e-${{ hashFiles('apps/cli-server/**/*.kts', 'apps/cli-server/gradle/libs.versions.toml') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-e2e-
+            gradle-${{ runner.os }}-
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run build
+      - name: Boot server with --encrypt and capture BIND line
+        run: |
+          cd apps/cli-server
+          stdbuf -oL -eL ./gradlew run --args="--port auto --path /tmp/sendme-e2e-enc --no-browser --encrypt" > /tmp/sendme.out 2>&1 &
+          for i in {1..60}; do
+            if grep -q '^BIND ' /tmp/sendme.out 2>/dev/null; then break; fi
+            sleep 1
+          done
+          URL=$(grep -E '^BIND ' /tmp/sendme.out | head -1 | sed -E 's/^BIND //')
+          if [ -z "$URL" ]; then
+            echo "::error::Encrypted server did not print a BIND line"
+            cat /tmp/sendme.out
+            exit 1
+          fi
+          echo "SENDME_E2E_URL=$URL" >> $GITHUB_ENV
+      - run: pnpm --filter @sendme/web exec playwright install --with-deps chromium webkit
+      - run: pnpm --filter @sendme/web e2e --grep encrypted
+      - if: always()
+        run: pkill -f 'gradle' 2>/dev/null || true
+
+  e2e-pin:
+    # Runs the correct-PIN flow spec against a server started with --pin.
+    # The cli-server prints the URL fragment `&pin=1234` which the
+    # PinLockScreen reads on mount to gate the dashboard. The BIND URL
+    # (with fragment) is exported to SENDME_E2E_URL; the spec navigates
+    # to that absolute URL so the browser sees the fragment.
+    #
+    # This job runs only the correct-flow spec on purpose: the rate-limit
+    # spec (see `e2e-pin-rate-limit`) deliberately consumes the 3-fail
+    # budget, which would lock the runner's source IP for 15 minutes and
+    # cascade into the second browser run of this job. Running them in
+    # separate jobs gives each a fresh server + limiter.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-e2e-pin-${{ hashFiles('apps/cli-server/**/*.kts', 'apps/cli-server/gradle/libs.versions.toml') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-e2e-pin-
+            gradle-${{ runner.os }}-e2e-
+            gradle-${{ runner.os }}-
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run build
+      - name: Boot server with --pin 1234 and capture BIND line
+        run: |
+          cd apps/cli-server
+          stdbuf -oL -eL ./gradlew run --args="--port auto --path /tmp/sendme-e2e-pin --no-browser --pin 1234" > /tmp/sendme.out 2>&1 &
+          for i in {1..240}; do
+            if grep -q '^BIND ' /tmp/sendme.out 2>/dev/null; then break; fi
+            sleep 1
+          done
+          URL=$(grep -E '^BIND ' /tmp/sendme.out | head -1 | sed -E 's/^BIND //')
+          if [ -z "$URL" ]; then
+            echo "::error::Pin server did not print a BIND line within 240s"
+            cat /tmp/sendme.out
+            exit 1
+          fi
+          echo "SENDME_E2E_URL=$URL" >> $GITHUB_ENV
+      - run: pnpm --filter @sendme/web exec playwright install --with-deps chromium webkit
+      - run: pnpm --filter @sendme/web e2e --grep "pin-correct-flow"
+      - if: always()
+        run: pkill -f 'gradle' 2>/dev/null || true
+
+  e2e-pin-rate-limit:
+    # Runs the 3-wrong-PIN rate-limit spec against a fresh server. The
+    # spec deliberately exhausts the 3-fail budget, so it can't share a
+    # server with the correct-flow spec (which would be locked for the
+    # rest of the 15-minute window). Runs on chromium only — the rate
+    # limiter behaviour is server-side, not browser-dependent.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-e2e-pinrl-${{ hashFiles('apps/cli-server/**/*.kts', 'apps/cli-server/gradle/libs.versions.toml') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-e2e-pinrl-
+            gradle-${{ runner.os }}-e2e-pin-
+            gradle-${{ runner.os }}-e2e-
+            gradle-${{ runner.os }}-
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run build
+      - name: Boot server with --pin 1234 and capture BIND line
+        run: |
+          cd apps/cli-server
+          stdbuf -oL -eL ./gradlew run --args="--port auto --path /tmp/sendme-e2e-pin-rl --no-browser --pin 1234" > /tmp/sendme.out 2>&1 &
+          for i in {1..240}; do
+            if grep -q '^BIND ' /tmp/sendme.out 2>/dev/null; then break; fi
+            sleep 1
+          done
+          URL=$(grep -E '^BIND ' /tmp/sendme.out | head -1 | sed -E 's/^BIND //')
+          if [ -z "$URL" ]; then
+            echo "::error::Pin-rate-limit server did not print a BIND line within 240s"
+            cat /tmp/sendme.out
+            exit 1
+          fi
+          echo "SENDME_E2E_URL=$URL" >> $GITHUB_ENV
+      - run: pnpm --filter @sendme/web exec playwright install --with-deps chromium
+      - run: pnpm --filter @sendme/web e2e --grep "pin-rate-limit" --project=chromium
+      - if: always()
+        run: pkill -f 'gradle' 2>/dev/null || true
+
+  shadow-jar:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run build
+      - uses: actions/cache@v4
+        with:
+          path: ~/.gradle
+          key: gradle-${{ runner.os }}-${{ hashFiles('apps/cli-server/**/*.kts', 'apps/cli-server/gradle/libs.versions.toml') }}
+      - run: cd apps/cli-server && ./gradlew shadowJar
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sendme-${{ matrix.os }}
+          path: apps/cli-server/build/libs/*-all.jar
+
+  agent-run:
+    # Refreshes the GraalVM native-image metadata under
+    # apps/cli-server/src/main/resources/META-INF/native-image/. The
+    # workflow fails the build if the metadata has drifted from what's
+    # committed, so a forgotten `metadataCopy` after a code change can't
+    # silently ship stale reflection / resource-config hints.
+    #
+    # Note: this job used to run inside `ghcr.io/graalvm/graalvm-ce:java21-22.3.0`,
+    # but that image was retired upstream. We now use `graalvm/setup-graalvm`
+    # to download the GraalVM JDK directly into the runner and set
+    # JAVA_HOME. Equivalent behaviour, no container dependency.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      JAVA_TOOL_OPTIONS: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/jdk.internal.misc=ALL-UNNAMED
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+      - uses: graalvm/setup-graalvm@v1
+        with:
+          distribution: 'graalvm-community'
+          java-version: '21'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run build
+      - uses: actions/cache@v4
+        with:
+          path: ~/.gradle
+          key: gradle-agentrun-${{ hashFiles('apps/cli-server/**/*.kts', 'apps/cli-server/gradle/libs.versions.toml') }}
+      # The org.graalvm.buildtools.gradleplugin 0.10.x exposes
+      # `metadataCopy` (copies the agent's output into the project's
+      # META-INF/native-image/) rather than the older `agentRun` task.
+      # See https://graalvm.github.io/native-build-tools/latest/gradle-plugin.html#collecting-metadata-automatically
+      - name: Run native-image agent and copy metadata into the project
+        run: cd apps/cli-server && ./gradlew metadataCopy
+      - name: Surface any metadata drift as a workflow error
+        run: |
+          if ! git diff --exit-code -- 'apps/cli-server/src/main/resources/META-INF/native-image/'; then
+            echo "::error::GraalVM metadata has drifted. Run the agent-run job locally with 'cd apps/cli-server && ./gradlew metadataCopy' and commit the changes."
+            exit 1
+          fi
+
+  native:
+    # Builds the GraalVM native binary via `gradle nativeCompile`. macOS
+    # builds are run on `macos-latest`; Linux on `ubuntu-latest`. The
+    # foojay-resolver-convention plugin in apps/cli-server/settings.gradle.kts
+    # handles JDK provisioning, so the runner just needs JAVA_HOME pointing
+    # at a GraalVM distribution.
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    env:
+      JAVA_TOOL_OPTIONS: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/jdk.internal.misc=ALL-UNNAMED
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+      - uses: graalvm/setup-graalvm@v1
+        with:
+          distribution: 'graalvm-community'
+          java-version: '21'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run build
+      - uses: actions/cache@v4
+        with:
+          path: ~/.gradle
+          key: gradle-${{ matrix.os }}-native-${{ hashFiles('apps/cli-server/**/*.kts', 'apps/cli-server/gradle/libs.versions.toml') }}
+      - run: cd apps/cli-server && ./gradlew nativeCompile
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sendme-native-${{ matrix.os }}
+          path: apps/cli-server/build/native/nativeCompile/sendme
