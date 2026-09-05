@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/preact';
 import { useWebSocket } from './useWebSocket';
 
@@ -28,5 +28,47 @@ describe('useWebSocket', () => {
     expect(result.current.events).toHaveLength(1);
     act(() => { result.current.send({ type: 'clipboard', text: 'hi' }); });
     expect(JSON.parse(ws.sent[0]!)).toEqual({ type: 'clipboard', text: 'hi' });
+  });
+  it('ignores a malformed frame rather than dropping the connection', () => {
+    // A truncated or non-JSON frame must not throw out of onmessage: the socket stays open
+    // and the page keeps working.
+    const { result } = renderHook(() => useWebSocket('ws://test/ws'));
+    const ws = FakeWS.instances[0]!;
+    act(() => { ws.triggerOpen(); });
+    act(() => { ws.onmessage?.({ data: 'not json' } as MessageEvent); });
+    expect(result.current.events).toHaveLength(0);
+    expect(result.current.status).toBe('open');
+  });
+
+  it('reports closed and reconnects after the socket drops', async () => {
+    vi.useFakeTimers();
+    try {
+      const { result } = renderHook(() => useWebSocket('ws://test/ws'));
+      const ws = FakeWS.instances[0]!;
+      act(() => { ws.triggerOpen(); });
+      act(() => { ws.onclose?.({ code: 1006 } as CloseEvent); });
+      expect(result.current.status).toBe('closed');
+
+      // A Wi-Fi blip should not require a page reload: the hook retries on a backoff.
+      act(() => { vi.advanceTimersByTime(1000); });
+      expect(FakeWS.instances).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not reconnect after unmount', async () => {
+    vi.useFakeTimers();
+    try {
+      const { unmount } = renderHook(() => useWebSocket('ws://test/ws'));
+      const ws = FakeWS.instances[0]!;
+      act(() => { ws.triggerOpen(); });
+      unmount();
+      act(() => { vi.advanceTimersByTime(60_000); });
+      // close() during teardown fires onclose, but the cancelled guard must stop the retry.
+      expect(FakeWS.instances).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
