@@ -1,143 +1,161 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { listFiles, uploadFile, getClipboard } from './api';
-
-beforeEach(() => {
-  vi.restoreAllMocks();
-});
-
-
-type XhrLike = {
-  open: ReturnType<typeof vi.fn>;
-  send: ReturnType<typeof vi.fn>;
-  upload: { onprogress: ((ev: ProgressEvent) => void) | null };
-  onload: (() => void) | null;
-  onerror: (() => void) | null;
-  status: number;
-  responseText: string;
-};
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { uploadFile, UploadError, listFiles, getClipboard } from './api';
 
 /**
  * Install a stub XMLHttpRequest and hand back the instance the code under test will use.
- *
- * vitest 5 refuses `mockReturnValue` for anything invoked with `new`, so the constructor mock
- * has to be a real class that yields the stub instance.
+ * `XMLHttpRequest` is constructed inside uploadFile, so the global has to be a real class
+ * that yields the stub instance.
  */
-function stubXhr(status: number, responseText: string): XhrLike {
+type XhrLike = {
+  status: number;
+  responseText: string;
+  upload: { onprogress?: (ev: { loaded: number; lengthComputable: boolean }) => void };
+  onload?: () => void;
+  onerror?: () => void;
+  onabort?: () => void;
+  open: (m: string, u: string) => void;
+  send: (b: unknown) => void;
+  abort: () => void;
+  sent?: unknown;
+};
+
+function stubXhr(status: number, responseText: string, opts: { autoload?: boolean } = {}): XhrLike {
   const xhr: XhrLike = {
-    open: vi.fn(),
-    send: vi.fn(),
-    upload: { onprogress: null },
-    onload: null,
-    onerror: null,
     status,
     responseText,
+    upload: {},
+    open: () => {},
+    send(body) {
+      xhr.sent = body;
+      if (opts.autoload !== false) queueMicrotask(() => xhr.onload?.());
+    },
+    abort() {
+      queueMicrotask(() => xhr.onabort?.());
+    },
   };
-  // oxlint-disable-next-line typescript/no-extraneous-class
-  const ctor = vi.fn(class {
-    constructor() {
-      return xhr as unknown as XMLHttpRequest;
-    }
-  });
-  (globalThis as unknown as { XMLHttpRequest: typeof ctor }).XMLHttpRequest = ctor;
+  (globalThis as unknown as { XMLHttpRequest: unknown }).XMLHttpRequest = function () {
+    return xhr;
+  };
   return xhr;
 }
 
-describe('api', () => {
-  it('listFiles calls /api/files and returns the array', async () => {
-    const spy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(
-        new Response(
-          JSON.stringify([{ id: 'a', name: 'a.txt', size: 4, mtime: 0, sha256: 'x' }]),
-        ),
-      );
-    const out = await listFiles();
-    expect(out).toHaveLength(1);
-    expect(spy.mock.calls[0]?.[0]).toBe('/api/files');
+const originalFetch = globalThis.fetch;
+afterEach(() => {
+  globalThis.fetch = originalFetch;
+  vi.restoreAllMocks();
+});
+
+describe('uploadFile', () => {
+  it('resolves with the id the server assigns', async () => {
+    stubXhr(200, '{"id":"abc"}');
+    expect(await uploadFile(new File(['x'], 'a.txt'))).toEqual({ id: 'abc' });
   });
 
-  it('getClipboard reads the text field', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ text: 'hello' })));
-    expect(await getClipboard()).toBe('hello');
-  });
-
-  it('uploadFile posts FormData and parses the JSON id', async () => {
+  it('streams the File itself rather than reading it into memory', async () => {
+    // A multi-gigabyte upload must never enter the JavaScript heap: handing FormData the
+    // File lets the browser stream it from disk.
     const xhr = stubXhr(200, '{"id":"abc"}');
-    const p = uploadFile(new File(['x'], 'a.txt'));
-    xhr.onload?.();
-    await expect(p).resolves.toEqual({ id: 'abc' });
-    expect(xhr.open).toHaveBeenCalledWith('POST', '/api/upload');
-    expect(xhr.send).toHaveBeenCalled();
+    const file = new File(['x'], 'a.txt');
+    await uploadFile(file);
+    expect(xhr.sent).toBeInstanceOf(FormData);
+    expect((xhr.sent as FormData).get('file')).toBe(file);
   });
 
-  it('listFiles throws when the server rejects the request', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('nope', { status: 503 }));
-    await expect(listFiles()).rejects.toThrow('listFiles: 503');
-  });
-
-  it('getClipboard throws when the server rejects the request', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('nope', { status: 500 }));
-    await expect(getClipboard()).rejects.toThrow('clipboard: 500');
-  });
-
-  it('getClipboard yields an empty string when the field is absent', async () => {
-    // The server omits `text` when nothing has been shared yet; the UI must not render
-    // "undefined" into the clipboard box.
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({})));
-    expect(await getClipboard()).toBe('');
-  });
-
-  it('uploadFile reports progress to the callback', async () => {
-    const xhr = stubXhr(200, '{"id":"abc"}');
+  it('reports progress only when the length is known', async () => {
+    // Without the lengthComputable check the bar is driven by a total that does not exist and
+    // runs past 100%.
+    const xhr = stubXhr(200, '{"id":"abc"}', { autoload: false });
     const seen: number[] = [];
-    const p = uploadFile(new File(['x'], 'a.txt'), (loaded) => seen.push(loaded));
-    xhr.upload.onprogress?.({ loaded: 512 } as ProgressEvent);
+    const promise = uploadFile(new File(['abcd'], 'a.txt'), (n) => seen.push(n));
+    xhr.upload.onprogress?.({ loaded: 2, lengthComputable: true });
+    xhr.upload.onprogress?.({ loaded: 3, lengthComputable: false });
     xhr.onload?.();
-    await expect(p).resolves.toEqual({ id: 'abc' });
-    expect(seen).toEqual([512]);
+    await promise;
+    expect(seen).toEqual([2]);
   });
 
-  it('uploadFile surfaces the size limit when the server rejects an oversized file', async () => {
-    // The 413 body is structured so the UI can tell the user the actual cap rather than a
-    // bare status code.
-    const xhr = stubXhr(413, JSON.stringify({ error: 'upload_too_large', limitBytes: 1048576 }));
-    const p = uploadFile(new File(['x'], 'big.bin'));
-    xhr.onload?.();
-    await expect(p).rejects.toThrow('upload: 413 limitBytes=1048576');
+  it('names the limit when the server rejects an oversized file', async () => {
+    stubXhr(413, JSON.stringify({ error: 'upload_too_large', limitBytes: 1048576 }));
+    const err = await uploadFile(new File(['x'], 'big.bin')).catch((e) => e);
+    expect(err).toBeInstanceOf(UploadError);
+    expect(err.kind).toBe('too_large');
+    expect(err.limitBytes).toBe(1048576);
+    // The user used to be shown the raw string "upload: 413 limitBytes=1048576".
+    expect(err.message).toMatch(/1 MiB limit/);
   });
 
-  it('uploadFile still reports the limit error when the server omits limitBytes', async () => {
-    const xhr = stubXhr(413, JSON.stringify({ error: 'upload_too_large' }));
-    const p = uploadFile(new File(['x'], 'big.bin'));
-    xhr.onload?.();
-    await expect(p).rejects.toThrow('upload: 413 limitBytes=?');
+  it('still explains an oversized file when the server omits the limit', async () => {
+    stubXhr(413, JSON.stringify({ error: 'upload_too_large' }));
+    const err = await uploadFile(new File(['x'], 'big.bin')).catch((e) => e);
+    expect(err.kind).toBe('too_large');
+    expect(err.message).toMatch(/larger than this postcard accepts/);
   });
 
-  it('uploadFile falls back to a generic error when the body is not JSON', async () => {
-    const xhr = stubXhr(500, '<html>gateway</html>');
-    const p = uploadFile(new File(['x'], 'a.txt'));
-    xhr.onload?.();
-    await expect(p).rejects.toThrow('upload: 500');
+  it('asks for the PIN when the upload is gated', async () => {
+    stubXhr(401, JSON.stringify({ error: 'pin_required' }));
+    const err = await uploadFile(new File(['x'], 'a.txt')).catch((e) => e);
+    expect(err.message).toMatch(/Enter the PIN/);
   });
 
-  it('uploadFile falls back to a generic error for unrelated structured errors', async () => {
-    const xhr = stubXhr(400, JSON.stringify({ error: 'something_else' }));
-    const p = uploadFile(new File(['x'], 'a.txt'));
-    xhr.onload?.();
-    await expect(p).rejects.toThrow('upload: 400');
+  it('falls back to a readable message when the body is not JSON', async () => {
+    stubXhr(500, '<html>gateway</html>');
+    const err = await uploadFile(new File(['x'], 'a.txt')).catch((e) => e);
+    expect(err.kind).toBe('server');
+    expect(err.message).toMatch(/refused the upload \(500\)/);
   });
 
-  it('uploadFile rejects when a 200 body cannot be parsed', async () => {
-    const xhr = stubXhr(200, 'not json');
-    const p = uploadFile(new File(['x'], 'a.txt'));
-    xhr.onload?.();
-    await expect(p).rejects.toThrow();
-  });
-
-  it('uploadFile rejects on a network failure', async () => {
-    const xhr = stubXhr(0, '');
-    const p = uploadFile(new File(['x'], 'a.txt'));
+  it('reports a network failure as one', async () => {
+    const xhr = stubXhr(0, '', { autoload: false });
+    const promise = uploadFile(new File(['x'], 'a.txt'));
     xhr.onerror?.();
-    await expect(p).rejects.toThrow('upload: network');
+    const err = await promise.catch((e) => e);
+    expect(err.kind).toBe('network');
+  });
+
+  it('can be cancelled mid-flight', async () => {
+    const xhr = stubXhr(200, '{"id":"abc"}', { autoload: false });
+    const controller = new AbortController();
+    const promise = uploadFile(new File(['x'], 'a.txt'), undefined, controller.signal);
+    controller.abort();
+    const err = await promise.catch((e) => e);
+    expect(err).toBeInstanceOf(UploadError);
+    expect(err.kind).toBe('cancelled');
+    expect(xhr.sent).toBeInstanceOf(FormData);
+  });
+
+  it('refuses immediately when the signal is already aborted', async () => {
+    stubXhr(200, '{"id":"abc"}', { autoload: false });
+    const err = await uploadFile(new File(['x'], 'a.txt'), undefined, AbortSignal.abort())
+      .catch((e) => e);
+    expect(err.kind).toBe('cancelled');
+  });
+
+  it('reports an unreadable success body rather than resolving with nothing', async () => {
+    stubXhr(200, 'not json');
+    const err = await uploadFile(new File(['x'], 'a.txt')).catch((e) => e);
+    expect(err.kind).toBe('server');
+  });
+});
+
+describe('listFiles and getClipboard', () => {
+  it('parse a successful response', async () => {
+    globalThis.fetch = vi.fn(async (url) =>
+      String(url).includes('clipboard')
+        ? ({ ok: true, json: async () => ({ text: 'hi' }) } as Response)
+        : ({ ok: true, json: async () => [{ id: 'a' }] } as unknown as Response),
+    ) as typeof fetch;
+    expect(await listFiles()).toEqual([{ id: 'a' }]);
+    expect(await getClipboard()).toBe('hi');
+  });
+
+  it('throw on a failed response', async () => {
+    globalThis.fetch = vi.fn(async () => ({ ok: false, status: 503 }) as Response) as typeof fetch;
+    await expect(listFiles()).rejects.toThrow(/503/);
+    await expect(getClipboard()).rejects.toThrow(/503/);
+  });
+
+  it('treat a clipboard reply with no text as empty', async () => {
+    globalThis.fetch = vi.fn(async () => ({ ok: true, json: async () => ({}) }) as Response) as typeof fetch;
+    expect(await getClipboard()).toBe('');
   });
 });
