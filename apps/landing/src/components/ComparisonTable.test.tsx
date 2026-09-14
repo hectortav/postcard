@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, within } from '@testing-library/preact';
+import { render, screen, within, fireEvent, waitFor, cleanup } from '@testing-library/preact';
 import { ComparisonTable } from './ComparisonTable';
 
 const ORIGINAL_INNER_WIDTH = window.innerWidth;
@@ -8,6 +8,7 @@ afterEach(() => {
   // Restore viewport between tests so a test that stubs innerWidth doesn't
   // leak into the next one.
   vi.stubGlobal('innerWidth', ORIGINAL_INNER_WIDTH);
+  cleanup();
 });
 
 function setViewport(width: number): void {
@@ -192,5 +193,24 @@ describe('ComparisonTable', () => {
       expect(text).toMatch(/✓ Yes \(Apple only\)/);
       expect(text).toMatch(/✗ Requires App/);
     });
+  });
+});
+
+describe('ComparisonTable layout', () => {
+  it('follows the viewport when the window is resized', async () => {
+    // The layout was read once at mount and never again, so rotating a phone left the wrong
+    // shape on screen until the page was reloaded.
+    setViewport(1200);
+    const { container } = render(<ComparisonTable />);
+    const section = container.querySelector('section')!;
+    expect(section.getAttribute('data-layout')).toBe('grid');
+
+    setViewport(400);
+    fireEvent(window, new Event('resize'));
+    await waitFor(() => expect(section.getAttribute('data-layout')).toBe('stack'));
+
+    setViewport(1200);
+    fireEvent(window, new Event('orientationchange'));
+    await waitFor(() => expect(section.getAttribute('data-layout')).toBe('grid'));
   });
 });
