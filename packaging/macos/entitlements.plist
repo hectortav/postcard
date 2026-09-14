@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!--
+    Hardened runtime entitlements for notarization.
+
+    A JVM needs to map memory it has written, because that is what a JIT is, and on the
+    Windows and Linux builds the bundled Chromium needs the same for its own JIT. Notarization
+    rejects a hardened-runtime binary that does this without asking, so these are the minimum
+    that lets postcard start at all under a hardened runtime.
+  -->
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+  <true/>
+  <!--
+    The app loads libpostcard-webview.dylib, which it builds itself, and (off the default
+    path) the JCEF natives. Both are signed with the same identity, but library validation
+    would still reject the JVM's own dlopen of them from Contents/app.
+  -->
+  <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
+  <!--
+    Deliberately NOT granted: no camera, no microphone, no address book, no automation. The
+    boilerplate Info.plist jpackage generates claims a microphone purpose string; see the
+    Info.plist template beside this file.
+  -->
+</dict>
+</plist>

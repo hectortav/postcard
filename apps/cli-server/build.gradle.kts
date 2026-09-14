@@ -242,6 +242,47 @@ val appVersion: String = run {
     if (!v.startsWith("0.")) v else "1." + v.removePrefix("0.")
 }
 
+/**
+ * The macOS signing identity, when one is configured.
+ *
+ * Signing is opt-in so a contributor without a certificate still gets a working build: with
+ * nothing set, every signing argument below is simply absent and the result is the unsigned
+ * installer this project has always produced. CI supplies it from a repository secret.
+ */
+val macSigningIdentity: String? =
+    (findProperty("postcard.macSigningIdentity") as String?)?.takeIf { it.isNotBlank() }
+        ?: System.getenv("POSTCARD_MAC_SIGNING_IDENTITY")?.takeIf { it.isNotBlank() }
+
+/** Signing arguments for jpackage, or nothing when no identity is configured. */
+fun macSigningArgs(): List<String> = if (macSigningIdentity == null) emptyList() else listOf(
+    "--mac-sign",
+    "--mac-signing-key-user-name", macSigningIdentity,
+    "--mac-entitlements", rootProject.file("../../packaging/macos/entitlements.plist").absolutePath,
+)
+
+/**
+ * Sign the binaries jpackage does not: the JNI webview bridge, and the JCEF natives on the
+ * builds that carry them. Deepest first, because signing a bundle invalidates the signature of
+ * anything added to it afterwards.
+ */
+fun signNestedBinaries() {
+    val identity = macSigningIdentity ?: return
+    val root = appImageDir.get().asFile
+    if (!root.exists()) return
+    val binaries = root.walkTopDown()
+        .filter { it.isFile && (it.extension == "dylib" || it.extension == "so") }
+        .toList()
+    for (binary in binaries) {
+        providers.exec {
+            commandLine(
+                "codesign", "--force", "--timestamp", "--options", "runtime",
+                "--sign", identity, binary.absolutePath,
+            )
+        }.result.get()
+    }
+    logger.lifecycle("postcard: signed ${'$'}{binaries.size} nested binaries")
+}
+
 /** The installer filename, which carries the real project version rather than appVersion. */
 fun installerName(extension: String): String =
     if (extension == "deb") "postcard_${version}_amd64.deb" else "postcard-$version.$extension"
@@ -392,6 +433,11 @@ tasks.register<Exec>("appImage") {
         addAll(listOf("--main-jar", shadowJarFile.name))
         addAll(listOf("--main-class", "io.postcard.Main"))
         addAll(listOf("--dest", appImageDir.get().asFile.parentFile.absolutePath))
+        if (isMac) {
+            // Replaces jpackage's boilerplate Info.plist, which declares a microphone purpose
+            // string postcard has no use for and a minimum OS version from 2015.
+            addAll(listOf("--resource-dir", rootProject.file("../../packaging/macos").absolutePath))
+        }
         // Chromium needs a real AWT toolkit, and JCEF needs these opens on macOS from JDK 16 on.
         addAll(listOf("--java-options", "-Djava.awt.headless=false"))
         // JCEF calls System.loadLibrary. On JDK 25 that is a restricted method: it warns today
@@ -407,6 +453,36 @@ tasks.register<Exec>("appImage") {
     })
 }
 
+/**
+ * Write the values jpackage does not substitute into a custom Info.plist.
+ *
+ * With the stock template every release reported CFBundleVersion 1.0, so macOS could not tell
+ * one install from another; with a custom template the keys come through as literal
+ * DEPLOY_* placeholders instead. Setting them here is the only way to be sure the bundle
+ * carries the version that was actually built.
+ */
+fun stampInfoPlist() {
+    val plist = File(appImageDir.get().asFile, "Contents/Info.plist")
+    if (!plist.exists()) return
+    fun set(key: String, value: String) {
+        providers.exec {
+            commandLine("/usr/libexec/PlistBuddy", "-c", "Set :$key $value", plist.absolutePath)
+        }.result.get()
+    }
+    set("CFBundleVersion", appVersion)
+    set("CFBundleShortVersionString", appVersion)
+    logger.lifecycle("postcard: stamped Info.plist with version $appVersion")
+}
+
+tasks.named("appImage") {
+    doLast {
+        if (isMac) {
+            stampInfoPlist()
+            signNestedBinaries()
+        }
+    }
+}
+
 tasks.register<Exec>("jpackageDmg") {
     group = "build"
     description = "Build a macOS .dmg installer (macOS only; disabled on other hosts)"
@@ -415,6 +491,7 @@ tasks.register<Exec>("jpackageDmg") {
     doFirst { installerDir.get().asFile.mkdirs() }
     commandLine(
         jpackageBin.absolutePath,
+        *macSigningArgs().toTypedArray(),
         "--type", "dmg",
         "--name", "postcard",
         // Pinned rather than derived from --vendor, so the bundle identity cannot drift.
