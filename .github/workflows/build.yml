@@ -18,9 +18,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.7.0
+      - uses: pnpm/action-setup@v6
       # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
       # happened to ship, so a GitHub image bump silently changed the runtime under CI.
       - uses: actions/setup-node@v7
@@ -42,9 +40,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.7.0
+      - uses: pnpm/action-setup@v6
       # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
       # happened to ship, so a GitHub image bump silently changed the runtime under CI.
       - uses: actions/setup-node@v7
@@ -65,9 +61,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.7.0
+      - uses: pnpm/action-setup@v6
       # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
       # happened to ship, so a GitHub image bump silently changed the runtime under CI.
       - uses: actions/setup-node@v7
@@ -91,9 +85,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.7.0
+      - uses: pnpm/action-setup@v6
       # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
       # happened to ship, so a GitHub image bump silently changed the runtime under CI.
       - uses: actions/setup-node@v7
@@ -129,9 +121,7 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.7.0
+      - uses: pnpm/action-setup@v6
       # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
       # happened to ship, so a GitHub image bump silently changed the runtime under CI.
       - uses: actions/setup-node@v7
@@ -190,9 +180,7 @@ jobs:
         os: [ubuntu-latest]
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.7.0
+      - uses: pnpm/action-setup@v6
       # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
       # happened to ship, so a GitHub image bump silently changed the runtime under CI.
       - uses: actions/setup-node@v7
@@ -244,9 +232,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.7.0
+      - uses: pnpm/action-setup@v6
       # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
       # happened to ship, so a GitHub image bump silently changed the runtime under CI.
       - uses: actions/setup-node@v7
@@ -303,9 +289,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.7.0
+      - uses: pnpm/action-setup@v6
       # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
       # happened to ship, so a GitHub image bump silently changed the runtime under CI.
       - uses: actions/setup-node@v7
@@ -357,9 +341,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.7.0
+      - uses: pnpm/action-setup@v6
       # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
       # happened to ship, so a GitHub image bump silently changed the runtime under CI.
       - uses: actions/setup-node@v7
@@ -410,9 +392,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.7.0
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
@@ -429,9 +409,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.7.0
+      - uses: pnpm/action-setup@v6
       # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
       # happened to ship, so a GitHub image bump silently changed the runtime under CI.
       - uses: actions/setup-node@v7
