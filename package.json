@@ -19,7 +19,7 @@
   },
   "devDependencies": {
     "@spotlightjs/spotlight": "^4.11.8",
-    "oxlint": "^1.81.0",
+    "oxlint": "^1.82.0",
     "prettier": "^3.9.6",
     "turbo": "^2.10.12",
     "typescript": "^7.0.2"

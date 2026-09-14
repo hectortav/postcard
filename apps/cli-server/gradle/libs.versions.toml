@@ -1,13 +1,18 @@
 [versions]
+# Javalin 7 is available and would move off Jetty 11, whose community support has ended.
+# It is not a version bump: 7 removed the routing API this server is written against
+# (app.get/post/before/ws all move), and the Jetty 11 handles used for the multipart and
+# WebSocket configuration go with it. That is a migration with its own testing, not something
+# to fold into a dependency sweep. Tracked rather than done.
 javalin = "6.7.0"
 # Javalin 6.3.0 owns the Jetty version via its jetty-bom import (Jetty 11.0.23).
 # We do not pin Jetty here because the brief's "12.0.10" pin conflicts with Javalin's
 # transitive: jetty-servlet has no 12.x publication and jetty-core has no 11.x
 # publication (Jetty renamed/removed modules between 11.x and 12.x). Letting
 # Javalin's BOM govern is the minimal fix.
-picocli = "4.7.6"
+picocli = "4.7.7"
 zxing = "3.5.3"
-slf4j = "2.0.17"
+slf4j = "2.0.19"
 logback = "1.5.20"
 # Jackson is optional in Javalin 6.3.0 (declared `<optional>true</optional>` in its POM), and
 # postcard uses it directly: the WebSocket clipboard handler parses `{type:"clipboard",...}`
@@ -15,13 +20,13 @@ logback = "1.5.20"
 # attacker-reachable input from any device on the network, which makes this the single
 # dependency most worth keeping current -- it was pinned to a 2022 build to match Javalin's
 # own transitive, and held there.
-jackson = "2.18.2"
+jackson = "2.22.2"
 junit = "5.11.4"
 mockito = "5.14.2"
 # shadow 8.1.1 (in the brief) was not published; the 8.x line starts at 8.3.0.
 # 8.3.5 was incompatible with the Gradle 9 application plugin (mainClassName removal),
 # so we use the first 9.x release, which is the line aligned with Gradle 9.
-shadow = "9.0.0"
+shadow = "9.6.1"
 # JCEF (embedded Chromium) via jcefmaven. The version tracks the Chromium major:
 # 146.0.10 is the current release. Natives are downloaded once at build time by the
 # `installCefNatives` task and bundled into the installer, so the app itself runs with

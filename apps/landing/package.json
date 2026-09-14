@@ -18,13 +18,13 @@
     "preact": "^10.29.8"
   },
   "devDependencies": {
-    "@playwright/test": "^1.62.1",
+    "@playwright/test": "^1.63.0",
     "@postcard/config-typescript": "workspace:*",
     "@preact/preset-vite": "^2.10.6",
     "@stylexjs/unplugin": "^0.17.0",
     "@testing-library/preact": "^3.2.4",
     "@vitest/coverage-v8": "^5.0.0",
-    "happy-dom": "^20.14.0",
+    "happy-dom": "^20.14.5",
     "typescript": "^7.0.2",
     "vite": "^8.2.2",
     "vitest": "^5.0.0"
