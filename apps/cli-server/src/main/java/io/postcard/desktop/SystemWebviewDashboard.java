@@ -120,7 +120,7 @@ public final class SystemWebviewDashboard implements Dashboard {
                 log.warn("postcard: webview open returned no handle");
             } else {
                 handle = h;
-                log.info("postcard: system dashboard opening ({})", url);
+                log.info("postcard: system dashboard opening ({})", io.postcard.util.Urls.redactFragment(url));
             }
         } catch (Exception | LinkageError e) {
             // A browser that refuses to start must never take down a running file server: the

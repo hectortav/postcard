@@ -41,6 +41,16 @@ jint JNI_OnLoad(JavaVM *vm, void *reserved) {
     return JNI_VERSION_1_6;
 }
 
+// NSLog writes to the macOS unified log, which persists to disk and is readable by any
+// local user via `log show`. The dashboard URL's fragment carries the AES key and the PIN,
+// so every URL that reaches a log line is truncated at the '#' first.
+static NSString *redactFragment(NSString *url) {
+    if (!url) return @"";
+    NSRange hash = [url rangeOfString:@"#"];
+    if (hash.location == NSNotFound) return url;
+    return [[url substringToIndex:hash.location] stringByAppendingString:@"#<redacted>"];
+}
+
 static JNIEnv *jniEnv(void) {
     JNIEnv *env = NULL;
     (*gJvm)->GetEnv(gJvm, (void **)&env, JNI_VERSION_1_6);
@@ -85,7 +95,7 @@ static jstring nsStringToJstr(JNIEnv *env, NSString *s) {
 
 - (void)webView:(WKWebView *)wv didFinishNavigation:(WKNavigation *)nav {
     (void)nav;
-    NSLog(@"postcard: webview finished loading (%@)", [[wv URL] absoluteString]);
+    NSLog(@"postcard: webview finished loading (%@)", redactFragment([[wv URL] absoluteString]));
     if (!gFirstLoadFired) {
         gFirstLoadFired = YES;
         JNIEnv *env = jniEnv();
@@ -99,7 +109,7 @@ static jstring nsStringToJstr(JNIEnv *env, NSString *s) {
         withError:(NSError *)error {
     (void)nav;
     NSLog(@"postcard: webview navigation failed (%@): %@",
-        [[wv URL] absoluteString], [error localizedDescription]);
+        redactFragment([[wv URL] absoluteString]), [error localizedDescription]);
 }
 
 - (void)webView:(WKWebView *)wv
@@ -107,7 +117,7 @@ static jstring nsStringToJstr(JNIEnv *env, NSString *s) {
         withError:(NSError *)error {
     (void)nav;
     NSLog(@"postcard: webview provisional navigation failed (%@): %@",
-        [[wv URL] absoluteString], [error localizedDescription]);
+        redactFragment([[wv URL] absoluteString]), [error localizedDescription]);
 }
 
 - (void)webView:(WKWebView *)wv
@@ -262,7 +272,7 @@ JNIEXPORT jlong JNICALL Java_io_postcard_desktop_MacWebview_openWindow(
         [gWin makeKeyAndOrderFront:nil];
         [NSApp activateIgnoringOtherApps:YES];
         [gWv loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:nsUrl]]];
-        NSLog(@"postcard: webview window opened (%@)", nsUrl);
+        NSLog(@"postcard: webview window opened (%@)", redactFragment(nsUrl));
         result = 1;
     });
     if (result == 0 && hostGlobal) (*env)->DeleteGlobalRef(env, hostGlobal);

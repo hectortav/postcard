@@ -151,7 +151,7 @@ public final class EmbeddedDashboard implements Dashboard {
             f.setVisible(true);
             synchronized (EmbeddedDashboard.this) { frame = f; }
         });
-        log.info("postcard: embedded dashboard opening ({})", url);
+        log.info("postcard: embedded dashboard opening ({})", io.postcard.util.Urls.redactFragment(url));
     }
 
     /** Without a download handler CEF silently drops every download. */

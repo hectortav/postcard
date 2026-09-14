@@ -58,7 +58,7 @@ public final class SystemTrayController {
                 log.info("SystemTray add failed ({}); running without tray icon", e.getMessage());
                 return Optional.empty();
             }
-            log.info("postcard tray icon installed (url={})", url);
+            log.info("postcard tray icon installed (url={})", io.postcard.util.Urls.redactFragment(url));
             return Optional.of(icon);
         } catch (InternalError | RuntimeException e) {
             // JDK-8303011: SystemTray on Linux can throw InternalError when the
@@ -93,8 +93,11 @@ public final class SystemTrayController {
      */
     static TrayIcon buildIcon(String url, Runnable onOpen, Runnable onQuit) {
         Image image = TrayIconFactory.create(64);
-        TrayIcon icon = new TrayIcon(image, "postcard — " + url);
-        icon.setToolTip("postcard — " + url);
+        // The tooltip is visible to anyone looking at the screen, and the URL fragment carries
+        // the AES key and the PIN. Copy Local URL still yields the real, complete URL.
+        String shown = "postcard — " + io.postcard.util.Urls.redactFragment(url);
+        TrayIcon icon = new TrayIcon(image, shown);
+        icon.setToolTip(shown);
         icon.setImageAutoSize(true);
 
         PopupMenu menu = new PopupMenu();

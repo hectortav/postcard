@@ -35,7 +35,7 @@ public final class DesktopIntegration {
         try {
             Desktop.getDesktop().browse(URI.create(url));
         } catch (Exception e) {
-            log.info("postcard: could not open a browser for {} ({})", url, e.getMessage());
+            log.info("postcard: could not open a browser for {} ({})", io.postcard.util.Urls.redactFragment(url), e.getMessage());
         }
     }
 
@@ -51,7 +51,7 @@ public final class DesktopIntegration {
         Objects.requireNonNull(url, "url");
         Objects.requireNonNull(opener, "opener");
         return () -> {
-            log.info("postcard: reopened, re-opening {}", url);
+            log.info("postcard: reopened, re-opening {}", io.postcard.util.Urls.redactFragment(url));
             try {
                 opener.accept(url);
             } catch (RuntimeException e) {
