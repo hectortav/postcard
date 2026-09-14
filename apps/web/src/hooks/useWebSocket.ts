@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'preact/hooks';
 import type { ServerEvent } from '../types';
 
 export type WsStatus = 'connecting' | 'open' | 'closed';
@@ -20,8 +20,12 @@ export function useWebSocket(url: string, onEvent?: (event: ServerEvent) => void
   const wsRef = useRef<WebSocket | null>(null);
   const retryRef = useRef(1000);
   // Held in a ref so a caller that rebuilds its handler every render does not reconnect.
+  // Written in a layout effect rather than during render: a render can be discarded, and a
+  // ref mutated on a discarded render is a value nothing asked for.
   const handlerRef = useRef(onEvent);
-  handlerRef.current = onEvent;
+  useLayoutEffect(() => {
+    handlerRef.current = onEvent;
+  });
 
   useEffect(() => {
     let cancelled = false;
