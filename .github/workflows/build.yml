@@ -75,10 +75,14 @@ jobs:
       - run: pnpm turbo run build
       - run: pnpm turbo run test
       - uses: actions/cache@v5
+        # Not on Windows. Saving the cache there fails every run inside the action's own tar
+        # ("C:\Program Files\Git\usr\bin\tar.exe failed with exit code 2"), so nothing is
+        # ever stored and nothing can be restored: the cache was inert and the only thing it
+        # produced was a warning on a green build. Skipping it says so out loud.
+        if: runner.os != 'Windows'
         with:
-          # The two directories worth keeping, rather than all of ~/.gradle. Caching the whole
-          # directory sweeps up daemon logs and lock files, and saving it on Windows fails
-          # outright ("tar.exe failed with exit code 2"), so those jobs cached nothing at all.
+          # The two directories worth keeping, rather than all of ~/.gradle, which also sweeps
+          # up daemon logs and lock files.
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
@@ -427,10 +431,14 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm turbo run build
       - uses: actions/cache@v5
+        # Not on Windows. Saving the cache there fails every run inside the action's own tar
+        # ("C:\Program Files\Git\usr\bin\tar.exe failed with exit code 2"), so nothing is
+        # ever stored and nothing can be restored: the cache was inert and the only thing it
+        # produced was a warning on a green build. Skipping it says so out loud.
+        if: runner.os != 'Windows'
         with:
-          # The two directories worth keeping, rather than all of ~/.gradle. Caching the whole
-          # directory sweeps up daemon logs and lock files, and saving it on Windows fails
-          # outright ("tar.exe failed with exit code 2"), so those jobs cached nothing at all.
+          # The two directories worth keeping, rather than all of ~/.gradle, which also sweeps
+          # up daemon logs and lock files.
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
