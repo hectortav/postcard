@@ -140,7 +140,11 @@ export async function decryptToBlob(
     }
     decryptOne(take(pending, remaining), true);
   } finally {
-    try { await reader.cancel(); } catch { /* already closed */ }
+    try {
+      await reader.cancel();
+    } catch {
+      /* already closed */
+    }
   }
 
   flushSlab();

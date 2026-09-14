@@ -42,7 +42,9 @@ describe('App', () => {
     const orig = globalThis.fetch;
     globalThis.fetch = vi.fn(async () => new Response('{}')) as unknown as typeof fetch;
     render(<App />);
-    await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/not connected|reconnecting/i));
+    await waitFor(() =>
+      expect(screen.getByRole('status').textContent).toMatch(/not connected|reconnecting/i),
+    );
     globalThis.fetch = orig;
     vi.mocked(listFiles).mockResolvedValue([]);
   });

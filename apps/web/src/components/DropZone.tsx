@@ -115,7 +115,9 @@ export function DropZone() {
         tabIndex={0}
         aria-label="Drop files here, or tap to choose"
       >
-        <div className={stylex(styles.glyph)} aria-hidden="true">⤓</div>
+        <div className={stylex(styles.glyph)} aria-hidden="true">
+          ⤓
+        </div>
         <p className={stylex(styles.headline)}>Drop files here, or tap to choose</p>
         <p className={stylex(styles.help)}>They will appear in the list below</p>
         <input
@@ -144,7 +146,10 @@ export function DropZone() {
                     aria-valuemax={100}
                     aria-valuenow={pct(it)}
                   >
-                    <span className={stylex(styles.progressFill)} style={{ width: `${pct(it)}%` }} />
+                    <span
+                      className={stylex(styles.progressFill)}
+                      style={{ width: `${pct(it)}%` }}
+                    />
                   </span>
                   <span className={stylex(styles.progressPct)}>{pct(it)}%</span>
                   <button
@@ -161,7 +166,11 @@ export function DropZone() {
                     className={stylex(styles.outcome, it.state === 'failed' && styles.outcomeBad)}
                     {...(it.state === 'failed' ? { role: 'alert' } : {})}
                   >
-                    {it.state === 'done' ? 'Sent' : it.state === 'cancelled' ? 'Cancelled' : it.message}
+                    {it.state === 'done'
+                      ? 'Sent'
+                      : it.state === 'cancelled'
+                        ? 'Cancelled'
+                        : it.message}
                   </span>
                   <button
                     type="button"
@@ -234,7 +243,8 @@ const styles = stylex.create({
     outline: 'none',
     ':focus-visible': {
       borderColor: '#A8332A',
-      boxShadow: 'inset 2px 2px 5px rgba(90,74,52,0.26), inset -2px -2px 4px #FFFBF2, 0 0 0 3px rgba(168,51,42,0.30)',
+      boxShadow:
+        'inset 2px 2px 5px rgba(90,74,52,0.26), inset -2px -2px 4px #FFFBF2, 0 0 0 3px rgba(168,51,42,0.30)',
     },
   },
   // Dragging over presses the well deeper.

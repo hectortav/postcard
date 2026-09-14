@@ -24,7 +24,9 @@ test('the dashboard decrypts a download back to the original bytes', async ({ pa
   // not plaintext -- which passed perfectly well against a browser that could not decrypt
   // them either, and did not. Receivers were being handed unreadable files.
   const up = await page.request.post('/api/upload', {
-    multipart: { file: { name: roundTripName, mimeType: 'text/plain', buffer: Buffer.from(SECRET) } },
+    multipart: {
+      file: { name: roundTripName, mimeType: 'text/plain', buffer: Buffer.from(SECRET) },
+    },
   });
   expect(up.ok()).toBeTruthy();
 

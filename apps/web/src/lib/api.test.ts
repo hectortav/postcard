@@ -125,8 +125,9 @@ describe('uploadFile', () => {
 
   it('refuses immediately when the signal is already aborted', async () => {
     stubXhr(200, '{"id":"abc"}', { autoload: false });
-    const err = await uploadFile(new File(['x'], 'a.txt'), undefined, AbortSignal.abort())
-      .catch((e) => e);
+    const err = await uploadFile(new File(['x'], 'a.txt'), undefined, AbortSignal.abort()).catch(
+      (e) => e,
+    );
     expect(err.kind).toBe('cancelled');
   });
 
@@ -155,7 +156,9 @@ describe('listFiles and getClipboard', () => {
   });
 
   it('treat a clipboard reply with no text as empty', async () => {
-    globalThis.fetch = vi.fn(async () => ({ ok: true, json: async () => ({}) }) as Response) as typeof fetch;
+    globalThis.fetch = vi.fn(
+      async () => ({ ok: true, json: async () => ({}) }) as Response,
+    ) as typeof fetch;
     expect(await getClipboard()).toBe('');
   });
 });

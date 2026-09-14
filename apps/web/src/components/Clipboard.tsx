@@ -5,7 +5,9 @@ export function Clipboard({ value, onChange }: { value: string; onChange: (t: st
   const ref = useRef<HTMLTextAreaElement>(null);
   const lastSent = useRef<string>(value);
 
-  useEffect(() => { if (ref.current && ref.current.value !== value) ref.current.value = value; }, [value]);
+  useEffect(() => {
+    if (ref.current && ref.current.value !== value) ref.current.value = value;
+  }, [value]);
 
   function onInput(ev: Event) {
     const t = (ev.target as HTMLTextAreaElement).value;
@@ -16,7 +18,9 @@ export function Clipboard({ value, onChange }: { value: string; onChange: (t: st
 
   return (
     <div className={stylex(styles.wrap)}>
-      <label className={stylex(styles.label)} htmlFor="postcard-clipboard">Shared clipboard</label>
+      <label className={stylex(styles.label)} htmlFor="postcard-clipboard">
+        Shared clipboard
+      </label>
       <p className={stylex(styles.help)}>Anything you type here shows up on the other devices.</p>
       <textarea
         id="postcard-clipboard"
@@ -60,7 +64,8 @@ const styles = stylex.create({
     '::placeholder': { color: '#8C8474' },
     ':focus': {
       borderColor: '#A8332A',
-      boxShadow: 'inset 2px 2px 5px rgba(90,74,52,0.26), inset -2px -2px 4px #FFFBF2, 0 0 0 3px rgba(168,51,42,0.28)',
+      boxShadow:
+        'inset 2px 2px 5px rgba(90,74,52,0.26), inset -2px -2px 4px #FFFBF2, 0 0 0 3px rgba(168,51,42,0.28)',
     },
   },
   help: { fontSize: '12px', color: '#8C8474', margin: 0 },

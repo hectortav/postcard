@@ -18,7 +18,9 @@ test('landing page renders all sections and airmail stripe', async ({ page }) =>
   expect(bg).toMatch(/repeating-linear-gradient/);
 
   // Hero headline.
-  await expect(page.getByRole('heading', { level: 1 })).toContainText(/send a file across the room/);
+  await expect(page.getByRole('heading', { level: 1 })).toContainText(
+    /send a file across the room/,
+  );
 
   // Three feature cards.
   await expect(page.getByText('Local-first')).toBeVisible();

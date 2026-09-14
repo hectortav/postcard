@@ -33,7 +33,10 @@ test('correct PIN unlocks the dashboard and files round-trip', async ({ browser 
   await expect(host.getByRole('tablist')).toBeVisible({ timeout: 10_000 });
 
   // Mobile: also a fresh context, different IP. It "scans" the QR.
-  const mobileCtx = await browser.newContext({ userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1' });
+  const mobileCtx = await browser.newContext({
+    userAgent:
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+  });
   const mobile = await mobileCtx.newPage();
   await mobile.goto(E2E_URL);
   await expect(mobile.getByTestId('pin-box-0')).toBeVisible({ timeout: 5_000 });
@@ -43,6 +46,10 @@ test('correct PIN unlocks the dashboard and files round-trip', async ({ browser 
   await expect(mobile.getByRole('tablist')).toBeVisible({ timeout: 10_000 });
 
   // Host drops a file; mobile should see it.
-  await host.setInputFiles('input[type=file]', { name: 'pin-hello.txt', mimeType: 'text/plain', buffer: Buffer.from('hi') });
+  await host.setInputFiles('input[type=file]', {
+    name: 'pin-hello.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('hi'),
+  });
   await expect(mobile.getByRole('link', { name: 'pin-hello.txt' })).toBeVisible({ timeout: 5_000 });
 });

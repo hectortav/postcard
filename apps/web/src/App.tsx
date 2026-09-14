@@ -15,7 +15,8 @@ import { fetchSession, DEFAULT_SESSION, type Session } from './lib/session';
 import { listFiles } from './lib/api';
 import { effectiveKey } from './security/pin';
 
-const WS_URL = (): string => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
+const WS_URL = (): string =>
+  `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
 
 type Tab = 'files' | 'clipboard' | 'qr';
 
@@ -88,7 +89,10 @@ export function App() {
       setFiles((prev) =>
         prev.some((f) => f.id === ev.id)
           ? prev
-          : [...prev, { id: ev.id, name: ev.name, size: ev.size, mtime: ev.mtime, sha256: ev.sha256 }],
+          : [
+              ...prev,
+              { id: ev.id, name: ev.name, size: ev.size, mtime: ev.mtime, sha256: ev.sha256 },
+            ],
       );
     } else if (ev.type === 'file_removed') {
       setFiles((prev) => prev.filter((f) => f.id !== ev.id));
@@ -233,9 +237,7 @@ export function App() {
               ))}
           </main>
           <footer className={stylex(styles.footer)}>
-            <span className={stylex(styles.mode)}>
-              {mode === 'hotspot' ? 'Hotspot' : 'LAN'}
-            </span>
+            <span className={stylex(styles.mode)}>{mode === 'hotspot' ? 'Hotspot' : 'LAN'}</span>
             <span className={stylex(styles.bind)}>{location.host}</span>
             <span className={stylex(styles.spacer)} />
             <span className={stylex(styles.signoff)}>by air</span>
@@ -297,8 +299,8 @@ const styles = stylex.create({
     overflow: 'hidden',
     '@media (max-width: 560px)': {
       // 100vh on iOS Safari counts the dynamic toolbar as visible, so the page overflows by
-    // exactly the toolbar's height. dvh tracks it; vh stays for engines without dvh.
-    minHeight: stylex.firstThatWorks('100dvh', '100vh'),
+      // exactly the toolbar's height. dvh tracks it; vh stays for engines without dvh.
+      minHeight: stylex.firstThatWorks('100dvh', '100vh'),
       borderRadius: '0',
       border: 'none',
       boxShadow: 'none',

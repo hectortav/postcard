@@ -40,7 +40,10 @@ function encryptLikeServer(plaintext: Uint8Array, fileId = FILE_ID): Uint8Array 
   }
   const out = new Uint8Array(pieces.reduce((n, p) => n + p.length, 0));
   let at = 0;
-  for (const p of pieces) { out.set(p, at); at += p.length; }
+  for (const p of pieces) {
+    out.set(p, at);
+    at += p.length;
+  }
   return out;
 }
 
@@ -79,7 +82,9 @@ describe('decryptToBlob', () => {
   it('reports progress in plaintext bytes', async () => {
     const plaintext = new Uint8Array(CHUNK_BYTES * 2).fill(3);
     const seen: number[] = [];
-    await decryptToBlob(KEY, streamOf([encryptLikeServer(plaintext)]), FILE_ID, (n) => seen.push(n));
+    await decryptToBlob(KEY, streamOf([encryptLikeServer(plaintext)]), FILE_ID, (n) =>
+      seen.push(n),
+    );
     expect(seen.at(-1)).toBe(plaintext.length);
     // Progress only ever moves forward.
     for (let i = 1; i < seen.length; i++) expect(seen[i]!).toBeGreaterThan(seen[i - 1]!);
@@ -94,7 +99,9 @@ describe('decryptToBlob', () => {
     const wire = encryptLikeServer(new Uint8Array(CHUNK_BYTES + 10).fill(1));
     const tampered = new Uint8Array(wire);
     tampered[20] = (tampered[20] ?? 0) ^ 0xff;
-    await expect(decryptToBlob(KEY, streamOf([tampered]), FILE_ID)).rejects.toThrow(DecryptionError);
+    await expect(decryptToBlob(KEY, streamOf([tampered]), FILE_ID)).rejects.toThrow(
+      DecryptionError,
+    );
   });
 
   it('rejects a truncated stream', async () => {
@@ -102,14 +109,16 @@ describe('decryptToBlob', () => {
     // chunk now at the end does not claim to be the end.
     const wire = encryptLikeServer(new Uint8Array(CHUNK_BYTES * 2 + 40).fill(1));
     const truncated = wire.subarray(0, WIRE_CHUNK_BYTES * 2);
-    await expect(decryptToBlob(KEY, streamOf([truncated]), FILE_ID)).rejects.toThrow(DecryptionError);
+    await expect(decryptToBlob(KEY, streamOf([truncated]), FILE_ID)).rejects.toThrow(
+      DecryptionError,
+    );
   });
 
   it('rejects a stream that ends mid-chunk', async () => {
     const wire = encryptLikeServer(new Uint8Array(100).fill(1));
-    await expect(
-      decryptToBlob(KEY, streamOf([wire.subarray(0, 8)]), FILE_ID),
-    ).rejects.toThrow(DecryptionError);
+    await expect(decryptToBlob(KEY, streamOf([wire.subarray(0, 8)]), FILE_ID)).rejects.toThrow(
+      DecryptionError,
+    );
   });
 
   it('rejects the right key against the wrong file', async () => {

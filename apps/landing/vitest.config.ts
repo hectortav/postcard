@@ -3,7 +3,12 @@ import preact from '@preact/preset-vite';
 import stylexPlugin from '@stylexjs/unplugin';
 
 export default defineConfig({
-  plugins: [preact(), stylexPlugin.vite({ unstable_moduleResolution: { type: 'commonJS', rootDir: import.meta.dirname } })],
+  plugins: [
+    preact(),
+    stylexPlugin.vite({
+      unstable_moduleResolution: { type: 'commonJS', rootDir: import.meta.dirname },
+    }),
+  ],
   test: {
     environment: 'happy-dom',
     globals: false,
@@ -19,12 +24,7 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'html'],
       include: ['src/**/*'],
-      exclude: [
-        'src/**/*.test.{ts,tsx}',
-        'src/**/*.spec.{ts,tsx}',
-        'src/main.tsx',
-        'src/types.ts',
-      ],
+      exclude: ['src/**/*.test.{ts,tsx}', 'src/**/*.spec.{ts,tsx}', 'src/main.tsx', 'src/types.ts'],
       thresholds: {
         lines: 85,
         branches: 85,

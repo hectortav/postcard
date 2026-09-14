@@ -43,7 +43,13 @@ describe('FileList', () => {
   describe('when the server sends this client ciphertext', () => {
     const KEY = new Uint8Array(32).fill(7);
     const PLAINTEXT = new TextEncoder().encode('the real contents');
-    const FILE = { id: 'abc12345', name: 'secret.txt', size: PLAINTEXT.length, mtime: 0, sha256: 'x' };
+    const FILE = {
+      id: 'abc12345',
+      name: 'secret.txt',
+      size: PLAINTEXT.length,
+      mtime: 0,
+      sha256: 'x',
+    };
 
     const originalFetch = globalThis.fetch;
     const originalCreate = URL.createObjectURL;
@@ -65,7 +71,10 @@ describe('FileList', () => {
       globalThis.fetch = vi.fn(async () => ({
         ok: true,
         body: new ReadableStream<Uint8Array>({
-          start(c) { c.enqueue(wire); c.close(); },
+          start(c) {
+            c.enqueue(wire);
+            c.close();
+          },
         }),
       })) as unknown as typeof fetch;
     }
@@ -83,7 +92,10 @@ describe('FileList', () => {
     it('decrypts and saves the plaintext', async () => {
       serveEncrypted();
       let saved: Blob | null = null;
-      URL.createObjectURL = vi.fn((b: Blob) => { saved = b; return 'blob:x'; }) as typeof URL.createObjectURL;
+      URL.createObjectURL = vi.fn((b: Blob) => {
+        saved = b;
+        return 'blob:x';
+      }) as typeof URL.createObjectURL;
       URL.revokeObjectURL = vi.fn();
 
       const { getByRole } = render(<FileList files={[FILE]} encrypted downloadKey={KEY} />);
@@ -103,7 +115,9 @@ describe('FileList', () => {
     });
 
     it('says so when the link carries no key', async () => {
-      const { getByRole, findByRole } = render(<FileList files={[FILE]} encrypted downloadKey={null} />);
+      const { getByRole, findByRole } = render(
+        <FileList files={[FILE]} encrypted downloadKey={null} />,
+      );
       fireEvent.click(getByRole('button', { name: /secret\.txt/ }));
       expect((await findByRole('alert')).textContent).toMatch(/missing its key/i);
     });
@@ -121,8 +135,9 @@ describe('FileList', () => {
       // The host's own window: the server already knows it does not need to encrypt for it,
       // so the download streams straight to disk and keeps resume support.
       const { getAllByRole } = render(<FileList files={[FILE]} encrypted={false} />);
-      expect((getAllByRole('link')[0] as HTMLAnchorElement).getAttribute('href'))
-        .toBe('/api/download/abc12345');
+      expect((getAllByRole('link')[0] as HTMLAnchorElement).getAttribute('href')).toBe(
+        '/api/download/abc12345',
+      );
     });
   });
 });

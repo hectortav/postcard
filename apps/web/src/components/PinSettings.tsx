@@ -72,10 +72,7 @@ export function PinSettings() {
           setNotice('Could not reach the server.');
           return;
         }
-        writeFragment(
-          typeof body.key === 'string' ? body.key : null,
-          nextPin,
-        );
+        writeFragment(typeof body.key === 'string' ? body.key : null, nextPin);
         setPin('');
         await refresh();
       } catch {
@@ -110,7 +107,9 @@ export function PinSettings() {
     <section aria-label="PIN protection" className={stylex(styles.section)}>
       <h2 className={stylex(styles.heading)}>PIN protection</h2>
       <p className={stylex(styles.status)}>
-        {on ? 'On — new devices must type the PIN.' : 'Off — anyone on your wifi can open the dashboard.'}
+        {on
+          ? 'On — new devices must type the PIN.'
+          : 'Off — anyone on your wifi can open the dashboard.'}
       </p>
       <div className={stylex(styles.row)}>
         <input
@@ -122,7 +121,9 @@ export function PinSettings() {
           placeholder="1234"
           value={pin}
           disabled={busy}
-          onInput={(e) => setPin((e.target as HTMLInputElement).value.replace(/[^0-9]/g, '').slice(0, 4))}
+          onInput={(e) =>
+            setPin((e.target as HTMLInputElement).value.replace(/[^0-9]/g, '').slice(0, 4))
+          }
         />
         <button
           type="button"

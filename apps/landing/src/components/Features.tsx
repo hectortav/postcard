@@ -23,7 +23,9 @@ const FEATURES: readonly Feature[] = [
 export function Features() {
   return (
     <section className={stylex(styles.section)} aria-labelledby="features-heading">
-      <h2 id="features-heading" className={stylex(styles.heading)}>What it does</h2>
+      <h2 id="features-heading" className={stylex(styles.heading)}>
+        What it does
+      </h2>
       <ul className={stylex(styles.grid)}>
         {FEATURES.map((f) => (
           <li key={f.title} className={stylex(styles.card)}>

@@ -37,7 +37,9 @@ export default defineConfig({
   base: BASE,
   plugins: [
     preact(),
-    stylexPlugin.vite({ unstable_moduleResolution: { type: 'commonJS', rootDir: import.meta.dirname } }),
+    stylexPlugin.vite({
+      unstable_moduleResolution: { type: 'commonJS', rootDir: import.meta.dirname },
+    }),
     injectStylexCss(),
   ],
   build: {

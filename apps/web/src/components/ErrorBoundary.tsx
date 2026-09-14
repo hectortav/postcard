@@ -26,8 +26,8 @@ export class ErrorBoundary extends Component<Props, State> {
       <div className={stylex(styles.wrap)} role="alert">
         <h1 className={stylex(styles.title)}>postcard hit a problem.</h1>
         <p className={stylex(styles.body)}>
-          The dashboard could not draw itself, but the server is very likely still running.
-          Reload the page, or open this address on another device:
+          The dashboard could not draw itself, but the server is very likely still running. Reload
+          the page, or open this address on another device:
         </p>
         <p className={stylex(styles.url)}>{typeof location === 'undefined' ? '' : location.host}</p>
         <p className={stylex(styles.detail)}>{error.message}</p>

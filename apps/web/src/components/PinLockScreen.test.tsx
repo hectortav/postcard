@@ -12,11 +12,7 @@ function mount(opts: {
   const verify = opts.verify ?? vi.fn().mockResolvedValue({ ok: true } as VerifyResult);
   const onVerified = opts.onVerified ?? vi.fn();
   const result = render(
-    <PinLockScreen
-      pinLength={opts.pinLength ?? 4}
-      verify={verify}
-      onVerified={onVerified}
-    />,
+    <PinLockScreen pinLength={opts.pinLength ?? 4} verify={verify} onVerified={onVerified} />,
   );
   return { verify, onVerified, ...result };
 }
@@ -91,7 +87,9 @@ describe('PinLockScreen', () => {
   });
 
   it('on 429 lockout: shows the countdown and disables the inputs', async () => {
-    const verify = vi.fn().mockResolvedValue({ ok: false, reason: 'locked', lockoutMs: 60_000 } as VerifyResult);
+    const verify = vi
+      .fn()
+      .mockResolvedValue({ ok: false, reason: 'locked', lockoutMs: 60_000 } as VerifyResult);
     const { getByTestId, getByText } = mount({ verify });
     for (let i = 0; i < PIN.length; i++) typeDigit(getByTestId, i, PIN[i]!);
     await waitFor(() => expect(getByText(/remaining/i)).toBeTruthy());
@@ -101,7 +99,9 @@ describe('PinLockScreen', () => {
   });
 
   it('lockout countdown ticks down to zero and re-enables the inputs', async () => {
-    const verify = vi.fn().mockResolvedValue({ ok: false, reason: 'locked', lockoutMs: 500 } as VerifyResult);
+    const verify = vi
+      .fn()
+      .mockResolvedValue({ ok: false, reason: 'locked', lockoutMs: 500 } as VerifyResult);
     const { getByTestId, queryByText } = mount({ verify });
     for (let i = 0; i < PIN.length; i++) typeDigit(getByTestId, i, PIN[i]!);
     await waitFor(() => expect(queryByText(/remaining/i)).toBeTruthy());

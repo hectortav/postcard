@@ -20,7 +20,6 @@ function makeSentinel(): WakeLockSentinel {
   } as unknown as WakeLockSentinel;
 }
 
-
 function setVisibility(state: DocumentVisibilityState): void {
   Object.defineProperty(document, 'visibilityState', { value: state, configurable: true });
 }
@@ -74,7 +73,9 @@ describe('useWakeLock', () => {
     expect(req).toHaveBeenCalledTimes(1);
 
     setVisibility('visible');
-    await act(async () => { document.dispatchEvent(new Event('visibilitychange')); });
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
     expect(req).toHaveBeenCalledTimes(2);
   });
 
@@ -85,7 +86,9 @@ describe('useWakeLock', () => {
     await act(async () => {});
 
     setVisibility('visible');
-    await act(async () => { document.dispatchEvent(new Event('visibilitychange')); });
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
     expect(req).toHaveBeenCalledTimes(1);
   });
 

@@ -18,8 +18,7 @@ beforeEach(() => {
 afterEach(cleanup);
 
 /** The drop target itself, which now sits inside a wrapper alongside the queue. */
-const zoneOf = (container: Element) =>
-  container.querySelector('[role="button"]') as HTMLElement;
+const zoneOf = (container: Element) => container.querySelector('[role="button"]') as HTMLElement;
 
 const drop = (container: Element, files: File[]) =>
   fireEvent.drop(zoneOf(container), { dataTransfer: { files } as unknown as DataTransfer });
@@ -42,7 +41,10 @@ describe('DropZone', () => {
     // names, with no way to tell which had finished and which had failed.
     let release: (() => void) | undefined;
     mockUpload.mockImplementation(
-      () => new Promise((resolve) => { release = () => resolve({ id: 'x' }); }),
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve({ id: 'x' });
+        }),
     );
     const { container } = render(<DropZone />);
     drop(container, [new File(['x'], 'one.txt'), new File(['y'], 'two.txt')]);
@@ -53,7 +55,12 @@ describe('DropZone', () => {
 
   it('keeps a failure attached to the file it belongs to', async () => {
     mockUpload
-      .mockRejectedValueOnce(new UploadError('too_large', 'That file is larger than the 1 MiB limit this postcard accepts.'))
+      .mockRejectedValueOnce(
+        new UploadError(
+          'too_large',
+          'That file is larger than the 1 MiB limit this postcard accepts.',
+        ),
+      )
       .mockResolvedValueOnce({ id: 'ok' });
     const { container, findByRole } = render(<DropZone />);
     drop(container, [new File(['x'], 'big.bin'), new File(['y'], 'small.txt')]);

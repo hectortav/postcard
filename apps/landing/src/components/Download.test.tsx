@@ -23,7 +23,9 @@ describe('Download', () => {
   });
 
   it('shows "Coming soon" when the release endpoint returns 404', async () => {
-    globalThis.fetch = vi.fn(async () => new Response('Not Found', { status: 404 })) as unknown as typeof fetch;
+    globalThis.fetch = vi.fn(
+      async () => new Response('Not Found', { status: 404 }),
+    ) as unknown as typeof fetch;
     render(<Download />);
     await waitFor(() => {
       expect(screen.getByText(/coming soon/i)).toBeTruthy();
@@ -48,10 +50,16 @@ describe('Download', () => {
       assets: [
         { name: 'postcard-0.1.0.dmg', browser_download_url: 'https://x/mac.dmg', size: 4_000_000 },
         { name: 'postcard-1.0.msi', browser_download_url: 'https://x/win.msi', size: 3_000_000 },
-        { name: 'postcard-0.1.0.AppImage', browser_download_url: 'https://x/linux.AppImage', size: 5_000_000 },
+        {
+          name: 'postcard-0.1.0.AppImage',
+          browser_download_url: 'https://x/linux.AppImage',
+          size: 5_000_000,
+        },
       ],
     };
-    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify(body), { status: 200 })) as unknown as typeof fetch;
+    globalThis.fetch = vi.fn(
+      async () => new Response(JSON.stringify(body), { status: 200 }),
+    ) as unknown as typeof fetch;
     render(<Download />);
     await waitFor(() => {
       expect(screen.getByRole('link', { name: /download macos/i })).toBeTruthy();
@@ -63,7 +71,10 @@ describe('Download', () => {
   it('shows the loading state before the fetch resolves', () => {
     let resolve: (r: Response) => void = () => {};
     globalThis.fetch = vi.fn(
-      () => new Promise<Response>((res) => { resolve = res; }),
+      () =>
+        new Promise<Response>((res) => {
+          resolve = res;
+        }),
     ) as unknown as typeof fetch;
     render(<Download />);
     expect(screen.getByText(/checking for the latest release/i)).toBeTruthy();
@@ -95,7 +106,11 @@ describe('Download', () => {
       assets: [
         { name: 'postcard-0.1.0.dmg', browser_download_url: 'https://x/mac.dmg', size: 900 },
         { name: 'postcard-1.0.msi', browser_download_url: 'https://x/win.msi', size: 2048 },
-        { name: 'postcard-0.1.0.deb', browser_download_url: 'https://x/linux.deb', size: 6_291_456 },
+        {
+          name: 'postcard-0.1.0.deb',
+          browser_download_url: 'https://x/linux.deb',
+          size: 6_291_456,
+        },
       ],
     };
     globalThis.fetch = vi.fn(

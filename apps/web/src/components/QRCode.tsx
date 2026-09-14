@@ -7,27 +7,32 @@ import QR from 'qrcode';
 import stylex from '@stylexjs/stylex';
 import { tokens } from '../tokens.stylex';
 
-type Props =
-  | { mode: 'lan'; url: string }
-  | { mode: 'hotspot'; ssid: string; password: string };
+type Props = { mode: 'lan'; url: string } | { mode: 'hotspot'; ssid: string; password: string };
 
 export function QRCode(props: Props) {
   const ref = useRef<HTMLDivElement>(null);
-  const text = props.mode === 'hotspot'
-    ? `WIFI:T:WPA;S:${props.ssid};P:${props.password};;`
-    : props.url;
+  const text =
+    props.mode === 'hotspot' ? `WIFI:T:WPA;S:${props.ssid};P:${props.password};;` : props.url;
 
   useEffect(() => {
     if (!ref.current) return;
-    QR.toString(text, { type: 'svg', margin: 1, color: { dark: tokens.colors.ink, light: tokens.colors.paper } })
-      .then((svg: string) => { if (ref.current) ref.current.innerHTML = svg; })
+    QR.toString(text, {
+      type: 'svg',
+      margin: 1,
+      color: { dark: tokens.colors.ink, light: tokens.colors.paper },
+    })
+      .then((svg: string) => {
+        if (ref.current) ref.current.innerHTML = svg;
+      })
       .catch(() => {});
   }, [text]);
 
-  const heading = props.mode === 'hotspot' ? 'Scan to join the hotspot' : 'Scan to open on another device';
-  const sub = props.mode === 'hotspot'
-    ? `Network: ${props.ssid}`
-    : 'Open the camera app and point it at the square.';
+  const heading =
+    props.mode === 'hotspot' ? 'Scan to join the hotspot' : 'Scan to open on another device';
+  const sub =
+    props.mode === 'hotspot'
+      ? `Network: ${props.ssid}`
+      : 'Open the camera app and point it at the square.';
 
   return (
     <div className={stylex(styles.wrap)}>

@@ -16,9 +16,7 @@ function setViewport(width: number): void {
 }
 
 function getSection(): HTMLElement {
-  return document.querySelector(
-    'section[aria-labelledby="comparison-heading"]',
-  ) as HTMLElement;
+  return document.querySelector('section[aria-labelledby="comparison-heading"]') as HTMLElement;
 }
 
 describe('ComparisonTable', () => {
@@ -65,8 +63,7 @@ describe('ComparisonTable', () => {
       setViewport(1280);
       render(<ComparisonTable />);
       const section = getSection();
-      const row = within(section).getByText('Executable Footprint')
-        .parentElement as HTMLElement;
+      const row = within(section).getByText('Executable Footprint').parentElement as HTMLElement;
       expect(row.textContent).toMatch(/~165-220 MB \(Chromium bundled\)/);
     });
 
@@ -74,8 +71,7 @@ describe('ComparisonTable', () => {
       setViewport(1280);
       render(<ComparisonTable />);
       const section = getSection();
-      const row = within(section).getByText('Security Layer')
-        .parentElement as HTMLElement;
+      const row = within(section).getByText('Security Layer').parentElement as HTMLElement;
       expect(row.textContent).toMatch(/AES-256-GCM \+ PIN/);
     });
 
@@ -83,8 +79,7 @@ describe('ComparisonTable', () => {
       setViewport(1280);
       render(<ComparisonTable />);
       const section = getSection();
-      const row = within(section).getByText('Platform Compatibility')
-        .parentElement as HTMLElement;
+      const row = within(section).getByText('Platform Compatibility').parentElement as HTMLElement;
       expect(row.textContent).toMatch(/macOS, Win, Linux, iOS, Android/);
     });
   });
@@ -94,8 +89,7 @@ describe('ComparisonTable', () => {
       setViewport(1280);
       render(<ComparisonTable />);
       const section = getSection();
-      const row = within(section).getByText('Executable Footprint')
-        .parentElement as HTMLElement;
+      const row = within(section).getByText('Executable Footprint').parentElement as HTMLElement;
       expect(row.textContent).toMatch(/OS native/);
       expect(row.textContent).toMatch(/Web only/);
       expect(row.textContent).toMatch(/~80-150 MB/);
@@ -128,9 +122,7 @@ describe('ComparisonTable', () => {
       // happy-dom normalises inline hex to itself; real browsers would
       // resolve to rgb(168, 51, 42). Accept either.
       const normalised = cs.borderTopColor.toLowerCase();
-      expect(
-        normalised === 'rgb(168, 51, 42)' || normalised === '#a8332a',
-      ).toBe(true);
+      expect(normalised === 'rgb(168, 51, 42)' || normalised === '#a8332a').toBe(true);
       expect(cs.borderTopWidth).toBe('1px');
       expect(cs.borderTopStyle).toBe('solid');
     });

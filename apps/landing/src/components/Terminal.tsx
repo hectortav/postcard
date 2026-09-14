@@ -9,11 +9,13 @@ import stylex from '@stylexjs/stylex';
 export function Terminal() {
   return (
     <section className={stylex(styles.section)} aria-labelledby="terminal-heading">
-      <h2 id="terminal-heading" className={stylex(styles.heading)}>Try it</h2>
+      <h2 id="terminal-heading" className={stylex(styles.heading)}>
+        Try it
+      </h2>
       <pre className={stylex(styles.block)} aria-label="Terminal session">
         <code>
-          <span className={stylex(styles.prompt)}>$</span>
-          {' '}<span className={stylex(styles.cmd)}>postcard --path ~/Desktop</span>
+          <span className={stylex(styles.prompt)}>$</span>{' '}
+          <span className={stylex(styles.cmd)}>postcard --path ~/Desktop</span>
           {'\n'}
           <span className={stylex(styles.out)}>BIND http://192.168.1.10:8080/</span>
           {'\n'}

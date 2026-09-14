@@ -12,9 +12,18 @@ test('the websocket sends no snapshot before the PIN is verified', async ({ page
       new Promise<string>((resolve) => {
         const ws = new WebSocket(url);
         const timer = setTimeout(() => resolve('silent'), 3000);
-        ws.onmessage = (e) => { clearTimeout(timer); resolve('frame:' + String(e.data).slice(0, 40)); };
-        ws.onclose = () => { clearTimeout(timer); resolve('closed'); };
-        ws.onerror = () => { clearTimeout(timer); resolve('closed'); };
+        ws.onmessage = (e) => {
+          clearTimeout(timer);
+          resolve('frame:' + String(e.data).slice(0, 40));
+        };
+        ws.onclose = () => {
+          clearTimeout(timer);
+          resolve('closed');
+        };
+        ws.onerror = () => {
+          clearTimeout(timer);
+          resolve('closed');
+        };
       }),
     wsUrl,
   );

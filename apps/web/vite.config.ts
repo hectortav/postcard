@@ -16,7 +16,8 @@ const injectStylexCss = (): import('vite').Plugin => ({
     order: 'post',
     handler(html) {
       const link = '<link rel="stylesheet" href="/assets/stylex.css">';
-      if (html.includes('href="/assets/stylex.css"') || html.includes('href="/stylex.css"')) return html;
+      if (html.includes('href="/assets/stylex.css"') || html.includes('href="/stylex.css"'))
+        return html;
       return html.replace('</head>', `  ${link}\n  </head>`);
     },
   },
@@ -25,7 +26,9 @@ const injectStylexCss = (): import('vite').Plugin => ({
 export default defineConfig({
   plugins: [
     preact(),
-    stylexPlugin.vite({ unstable_moduleResolution: { type: 'commonJS', rootDir: import.meta.dirname } }),
+    stylexPlugin.vite({
+      unstable_moduleResolution: { type: 'commonJS', rootDir: import.meta.dirname },
+    }),
     injectStylexCss(),
   ],
   build: {

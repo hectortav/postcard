@@ -38,8 +38,16 @@ describe('fetchLatestRelease', () => {
       assets: [
         { name: 'postcard-0.1.0.dmg', browser_download_url: 'https://x/mac.dmg', size: 4_000_000 },
         { name: 'postcard-1.0.msi', browser_download_url: 'https://x/win.msi', size: 3_000_000 },
-        { name: 'postcard-0.1.0.AppImage', browser_download_url: 'https://x/linux.AppImage', size: 5_000_000 },
-        { name: 'postcard-0.1.0.tar.gz', browser_download_url: 'https://x/src.tar.gz', size: 100_000 },
+        {
+          name: 'postcard-0.1.0.AppImage',
+          browser_download_url: 'https://x/linux.AppImage',
+          size: 5_000_000,
+        },
+        {
+          name: 'postcard-0.1.0.tar.gz',
+          browser_download_url: 'https://x/src.tar.gz',
+          size: 100_000,
+        },
       ],
     };
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify(body), { status: 200 }));

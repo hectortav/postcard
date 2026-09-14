@@ -36,7 +36,10 @@ export function useWebSocket(url: string, onEvent?: (event: ServerEvent) => void
       setStatus('connecting');
       const ws = new WebSocket(url);
       wsRef.current = ws;
-      ws.onopen = () => { retryRef.current = 1000; setStatus('open'); };
+      ws.onopen = () => {
+        retryRef.current = 1000;
+        setStatus('open');
+      };
       ws.onmessage = (ev) => {
         let parsed: ServerEvent;
         try {
@@ -47,7 +50,9 @@ export function useWebSocket(url: string, onEvent?: (event: ServerEvent) => void
         handlerRef.current?.(parsed);
       };
       // Without this an error with no close event leaves the UI claiming to be connected.
-      ws.onerror = () => { if (ws.readyState !== WebSocket.OPEN) setStatus('closed'); };
+      ws.onerror = () => {
+        if (ws.readyState !== WebSocket.OPEN) setStatus('closed');
+      };
       ws.onclose = () => {
         setStatus('closed');
         if (cancelled) return;

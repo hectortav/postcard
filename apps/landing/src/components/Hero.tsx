@@ -12,8 +12,8 @@ export function Hero() {
       <div className={stylex(styles.copy)}>
         <h1 className={stylex(styles.title)}>send a file across the room&mdash;</h1>
         <p className={stylex(styles.subtitle)}>
-          A local file-sharing CLI and web dashboard. Drop a file on one device, scan the
-          QR on the other. No cloud, no signup, nothing leaves your network.
+          A local file-sharing CLI and web dashboard. Drop a file on one device, scan the QR on the
+          other. No cloud, no signup, nothing leaves your network.
         </p>
       </div>
 
@@ -45,13 +45,7 @@ export function Hero() {
 function Postmark() {
   return (
     <svg viewBox="0 0 200 120" className={stylex(styles.postmark)} aria-hidden="true">
-      <g
-        fill="none"
-        stroke="#A8332A"
-        strokeWidth="3"
-        strokeLinecap="round"
-        opacity="0.55"
-      >
+      <g fill="none" stroke="#A8332A" strokeWidth="3" strokeLinecap="round" opacity="0.55">
         <circle cx="56" cy="60" r="40" />
         <circle cx="56" cy="60" r="27" strokeWidth="1.5" />
         <path d="M100 44 Q 126 32 152 44 T 204 44" />

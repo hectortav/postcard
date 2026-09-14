@@ -11,12 +11,25 @@ class FakeWS {
   onclose: ((ev: CloseEvent) => void) | null = null;
   onerror: ((ev: Event) => void) | null = null;
   static readonly OPEN = 1;
-  constructor(url: string) { this.url = url; FakeWS.instances.push(this); }
-  send(data: string) { this.sent.push(data); }
-  close() { this.readyState = 3; this.onclose?.({ code: 1000 } as CloseEvent); }
+  constructor(url: string) {
+    this.url = url;
+    FakeWS.instances.push(this);
+  }
+  send(data: string) {
+    this.sent.push(data);
+  }
+  close() {
+    this.readyState = 3;
+    this.onclose?.({ code: 1000 } as CloseEvent);
+  }
   static instances: FakeWS[] = [];
-  triggerOpen() { this.readyState = 1; this.onopen?.({} as Event); }
-  triggerMessage(data: unknown) { this.onmessage?.({ data: JSON.stringify(data) } as MessageEvent); }
+  triggerOpen() {
+    this.readyState = 1;
+    this.onopen?.({} as Event);
+  }
+  triggerMessage(data: unknown) {
+    this.onmessage?.({ data: JSON.stringify(data) } as MessageEvent);
+  }
 }
 
 beforeEach(() => {
@@ -29,10 +42,15 @@ describe('useWebSocket', () => {
     const seen: unknown[] = [];
     const { result } = renderHook(() => useWebSocket('ws://test/ws', (e) => seen.push(e)));
     const ws = FakeWS.instances[0]!;
-    await act(async () => { ws.triggerOpen(); ws.triggerMessage({ type: 'snapshot', files: [], clipboard: '' }); });
+    await act(async () => {
+      ws.triggerOpen();
+      ws.triggerMessage({ type: 'snapshot', files: [], clipboard: '' });
+    });
     expect(result.current.status).toBe('open');
     expect(seen).toHaveLength(1);
-    act(() => { result.current.send({ type: 'clipboard', text: 'hi' }); });
+    act(() => {
+      result.current.send({ type: 'clipboard', text: 'hi' });
+    });
     expect(JSON.parse(ws.sent[0]!)).toEqual({ type: 'clipboard', text: 'hi' });
   });
 
@@ -56,16 +74,23 @@ describe('useWebSocket', () => {
     // Still CONNECTING: the real WebSocket throws InvalidStateError here.
     expect(result.current.send({ type: 'clipboard', text: 'lost' })).toBe(false);
     expect(ws.sent).toHaveLength(0);
-    act(() => { ws.triggerOpen(); });
+    act(() => {
+      ws.triggerOpen();
+    });
     expect(result.current.send({ type: 'clipboard', text: 'kept' })).toBe(true);
   });
 
   it('reports a socket error as not connected', () => {
     const { result } = renderHook(() => useWebSocket('ws://test/ws'));
     const ws = FakeWS.instances[0]!;
-    act(() => { ws.triggerOpen(); });
+    act(() => {
+      ws.triggerOpen();
+    });
     expect(result.current.status).toBe('open');
-    act(() => { ws.readyState = 3; ws.onerror?.({} as Event); });
+    act(() => {
+      ws.readyState = 3;
+      ws.onerror?.({} as Event);
+    });
     expect(result.current.status).toBe('closed');
   });
   it('ignores a malformed frame rather than dropping the connection', () => {
@@ -73,8 +98,12 @@ describe('useWebSocket', () => {
     // and the page keeps working.
     const { result } = renderHook(() => useWebSocket('ws://test/ws'));
     const ws = FakeWS.instances[0]!;
-    act(() => { ws.triggerOpen(); });
-    act(() => { ws.onmessage?.({ data: 'not json' } as MessageEvent); });
+    act(() => {
+      ws.triggerOpen();
+    });
+    act(() => {
+      ws.onmessage?.({ data: 'not json' } as MessageEvent);
+    });
     expect(result.current.status).toBe('open');
   });
 
@@ -83,12 +112,18 @@ describe('useWebSocket', () => {
     try {
       const { result } = renderHook(() => useWebSocket('ws://test/ws'));
       const ws = FakeWS.instances[0]!;
-      act(() => { ws.triggerOpen(); });
-      act(() => { ws.onclose?.({ code: 1006 } as CloseEvent); });
+      act(() => {
+        ws.triggerOpen();
+      });
+      act(() => {
+        ws.onclose?.({ code: 1006 } as CloseEvent);
+      });
       expect(result.current.status).toBe('closed');
 
       // A Wi-Fi blip should not require a page reload: the hook retries on a backoff.
-      act(() => { vi.advanceTimersByTime(1000); });
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
       expect(FakeWS.instances).toHaveLength(2);
     } finally {
       vi.useRealTimers();
@@ -100,9 +135,13 @@ describe('useWebSocket', () => {
     try {
       const { unmount } = renderHook(() => useWebSocket('ws://test/ws'));
       const ws = FakeWS.instances[0]!;
-      act(() => { ws.triggerOpen(); });
+      act(() => {
+        ws.triggerOpen();
+      });
       unmount();
-      act(() => { vi.advanceTimersByTime(60_000); });
+      act(() => {
+        vi.advanceTimersByTime(60_000);
+      });
       // close() during teardown fires onclose, but the cancelled guard must stop the retry.
       expect(FakeWS.instances).toHaveLength(1);
     } finally {

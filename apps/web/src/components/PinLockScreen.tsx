@@ -101,7 +101,10 @@ export function PinLockScreen({ pinLength, onVerified, verify }: Props) {
     const raw = (ev.target as HTMLInputElement).value;
     // Allow pasting a full PIN into any box: distribute the digits.
     if (raw.length > 1) {
-      const chars = raw.replace(/\D/g, '').split('').slice(0, pinLength - i);
+      const chars = raw
+        .replace(/\D/g, '')
+        .split('')
+        .slice(0, pinLength - i);
       if (chars.length === 0) return;
       setDigits((prev) => {
         const next = prev.slice();
@@ -155,12 +158,21 @@ export function PinLockScreen({ pinLength, onVerified, verify }: Props) {
   const locked = lockoutMs > 0;
 
   return (
-    <div className={stylex(styles.shell)} role="dialog" aria-modal="true" aria-labelledby="pin-heading">
+    <div
+      className={stylex(styles.shell)}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="pin-heading"
+    >
       <div className={stylex(styles.watermark)} aria-hidden="true">
         <Stamp size={440} hole="#E3D9C4" title="" />
       </div>
       <style dangerouslySetInnerHTML={{ __html: SHAKE_CSS }} />
-      <div className={stylex(styles.card, shake > 0 && styles.cardShake)} key={shake} data-shake={shake}>
+      <div
+        className={stylex(styles.card, shake > 0 && styles.cardShake)}
+        key={shake}
+        data-shake={shake}
+      >
         <div className={stylex(styles.stripe)} aria-hidden="true" />
         <h2 id="pin-heading" className={stylex(styles.heading)}>
           Enter the {pinLength}-digit PIN shown on the other device
@@ -170,7 +182,9 @@ export function PinLockScreen({ pinLength, onVerified, verify }: Props) {
           {digits.map((d, i) => (
             <input
               key={i}
-              ref={(el) => { inputRefs.current[i] = el; }}
+              ref={(el) => {
+                inputRefs.current[i] = el;
+              }}
               type="text"
               inputMode="numeric"
               autoComplete="one-time-code"
@@ -270,8 +284,7 @@ const styles = stylex.create({
     left: 0,
     right: 0,
     height: '5px',
-    backgroundImage:
-      'repeating-linear-gradient(135deg, #A8332A 0 10px, #1A1714 10px 20px)',
+    backgroundImage: 'repeating-linear-gradient(135deg, #A8332A 0 10px, #1A1714 10px 20px)',
   },
   heading: {
     fontFamily: '"Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif',
@@ -299,7 +312,8 @@ const styles = stylex.create({
     transitionDuration: '140ms',
     ':focus': {
       borderColor: '#A8332A',
-      boxShadow: 'inset 2px 2px 5px rgba(90,74,52,0.26), inset -2px -2px 4px rgba(255,251,242,0.9), 0 0 0 3px rgba(168,51,42,0.30)',
+      boxShadow:
+        'inset 2px 2px 5px rgba(90,74,52,0.26), inset -2px -2px 4px rgba(255,251,242,0.9), 0 0 0 3px rgba(168,51,42,0.30)',
     },
   },
   boxBusy: { opacity: '0.55' },

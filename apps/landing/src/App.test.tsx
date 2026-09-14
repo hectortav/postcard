@@ -21,18 +21,26 @@ describe('App', () => {
 
   it('renders all five sections: hero, features, terminal, download, footer', async () => {
     // Stub the release fetch so the Download component doesn't hit the real API.
-    globalThis.fetch = vi.fn(async () => new Response('Not Found', { status: 404 })) as unknown as typeof fetch;
+    globalThis.fetch = vi.fn(
+      async () => new Response('Not Found', { status: 404 }),
+    ) as unknown as typeof fetch;
     render(<App />);
     // Hero
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/send a file across the room/);
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(
+      /send a file across the room/,
+    );
     // Features (scope to the features section because "Cross-platform" also
     // appears in the comparison table's Platform Compatibility row).
-    const featuresSection = document.querySelector('section[aria-labelledby="features-heading"]') as HTMLElement;
+    const featuresSection = document.querySelector(
+      'section[aria-labelledby="features-heading"]',
+    ) as HTMLElement;
     expect(within(featuresSection).getByText('Local-first')).toBeTruthy();
     expect(within(featuresSection).getByText('Encrypted')).toBeTruthy();
     expect(within(featuresSection).getByText('Cross-platform')).toBeTruthy();
     // Comparison table now lives between Features and Terminal.
-    const comparisonSection = document.querySelector('section[aria-labelledby="comparison-heading"]') as HTMLElement;
+    const comparisonSection = document.querySelector(
+      'section[aria-labelledby="comparison-heading"]',
+    ) as HTMLElement;
     expect(within(comparisonSection).getByText('How it compares')).toBeTruthy();
     // Terminal
     expect(screen.getByText(/postcard --path/)).toBeTruthy();
@@ -40,9 +48,9 @@ describe('App', () => {
     await waitFor(() => expect(screen.getByText(/coming soon/i)).toBeTruthy());
     // Footer (anchored to the index-zr0 repo URL so it doesn't collide
     // with the "GitHub releases" link in the download section)
-    const footerLink = screen.getAllByRole('link').find(
-      (a) => a.getAttribute('href') === 'https://github.com/hectortav/postcard',
-    );
+    const footerLink = screen
+      .getAllByRole('link')
+      .find((a) => a.getAttribute('href') === 'https://github.com/hectortav/postcard');
     expect(footerLink).toBeTruthy();
     expect(footerLink?.textContent?.toLowerCase()).toBe('github');
   });

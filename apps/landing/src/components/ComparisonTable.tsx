@@ -97,9 +97,7 @@ export function ComparisonTable() {
                 role="columnheader"
                 style={col.emphasis ? { borderTop: '1px solid #A8332A' } : undefined}
               >
-                {col.emphasis && (
-                  <span className={stylex(styles.youAreHere)}>← you are here</span>
-                )}
+                {col.emphasis && <span className={stylex(styles.youAreHere)}>← you are here</span>}
                 <span className={stylex(styles.headerPill)}>{col.name}</span>
               </div>
             ))}

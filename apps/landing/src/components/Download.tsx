@@ -54,7 +54,9 @@ export function Download() {
 
   return (
     <section className={stylex(styles.section)} aria-labelledby="download-heading">
-      <h2 id="download-heading" className={stylex(styles.heading)}>Get it</h2>
+      <h2 id="download-heading" className={stylex(styles.heading)}>
+        Get it
+      </h2>
       {status === 'loading' && (
         <p className={stylex(styles.help)}>Checking for the latest release…</p>
       )}
@@ -62,7 +64,12 @@ export function Download() {
         <div className={stylex(styles.comingSoon)}>
           <p className={stylex(styles.comingSoonText)}>
             Coming soon — see{' '}
-            <a className={stylex(styles.link)} href={RELEASES_PAGE} target="_blank" rel="noreferrer">
+            <a
+              className={stylex(styles.link)}
+              href={RELEASES_PAGE}
+              target="_blank"
+              rel="noreferrer"
+            >
               GitHub releases
             </a>{' '}
             for builds.
@@ -77,7 +84,11 @@ export function Download() {
             return (
               <a
                 key={id}
-                className={stylex(styles.button, active && styles.buttonActive, !asset && styles.buttonDisabled)}
+                className={stylex(
+                  styles.button,
+                  active && styles.buttonActive,
+                  !asset && styles.buttonDisabled,
+                )}
                 href={asset?.url ?? RELEASES_PAGE}
                 target={asset ? '_blank' : undefined}
                 rel={asset ? 'noreferrer' : undefined}
