@@ -18,27 +18,77 @@ public final class Main {
      */
     private static final long QUIT_GRACE_MILLIS = 5_000;
 
+    /** Bad command line: an unparsable flag, or a --port that is neither a number nor 'auto'. */
+    static final int EXIT_BAD_ARGS = 2;
+    /** The requested address and port could not be bound. */
+    static final int EXIT_PORT_UNAVAILABLE = 3;
+    /** No LAN address to serve on, and no hotspot fallback. */
+    static final int EXIT_NO_INTERFACE = 4;
+    /** --pin was supplied but could not be armed. */
+    static final int EXIT_PIN_FAILED = 5;
+
+    /** Innermost message of a cause chain; bind failures wrap the useful part several deep. */
+    static String rootCauseMessage(Throwable t) {
+        Throwable c = t;
+        while (c.getCause() != null && c.getCause() != c) c = c.getCause();
+        var m = c.getMessage();
+        return (m == null || m.isBlank()) ? c.getClass().getSimpleName() : m;
+    }
+
     public static void main(String[] args) throws Exception {
         var log = org.slf4j.LoggerFactory.getLogger(Main.class);
         var opts = new PostcardOptions();
-        if (new CommandLine(opts).execute(args) != 0) System.exit(1);
+        var cmd = new CommandLine(opts);
+        // execute() returns ExitCode.OK when it has *handled* --help or --version, so the
+        // old `!= 0` guard fell through and started a real server -- binding a port, creating
+        // a temp directory and opening a window -- after printing the usage text.
+        if (cmd.execute(args) != 0) System.exit(EXIT_BAD_ARGS);
+        var parsed = cmd.getParseResult();
+        if (parsed.isUsageHelpRequested() || parsed.isVersionHelpRequested()) return;
         var server = new Server(opts);
         server.init();
+        // A previous run killed mid-upload can leave spooled bodies behind; nothing is in
+        // flight yet, so this is the one safe moment to reclaim them.
+        server.sweepUploadSpool();
         Inet4Address bind = null;
         if (opts.host != null) bind = (Inet4Address) java.net.InetAddress.getByName(opts.host);
         else bind = NetworkInterfaceSelector.selectPrimary();
         if (bind == null) {
             HotspotLauncher.Result hs = HotspotLauncher.attempt();
             if (hs != null && hs.interfaceIp() != null) { bind = hs.interfaceIp(); server.setMode("hotspot"); }
-            else { System.err.println(hs == null ? "No LAN IPv4 and no usable hotspot." : hs.instructions().text()); System.exit(1); }
+            else {
+                System.err.println(hs == null
+                    ? "postcard: no usable LAN address found.\n"
+                      + "  Connect to Wi-Fi or Ethernet, or name an address yourself with --host <addr>."
+                    : hs.instructions().text());
+                System.exit(EXIT_NO_INTERFACE);
+            }
         }
         // PIN management is owner-only (see Server.isOwnerIp): the dashboard call
         // comes from this same address, receivers from theirs.
         server.setBindHost(bind.getHostAddress());
         var app = server.build();
-        int port = parsePortOrZero(opts.port);
-        app.start(bind.getHostAddress(), port);
+        int port;
+        try {
+            port = parsePortOrZero(opts.port);
+        } catch (NumberFormatException e) {
+            System.err.println("postcard: --port must be a number or 'auto' (got '" + opts.port + "')");
+            System.exit(EXIT_BAD_ARGS);
+            return;
+        }
+        try {
+            app.start(bind.getHostAddress(), port);
+        } catch (Exception e) {
+            // Javalin wraps a bind failure; the stack trace it used to print told the user
+            // nothing they could act on.
+            System.err.println("postcard: could not bind " + bind.getHostAddress() + ":" + port
+                + " (" + rootCauseMessage(e) + ")\n"
+                + "  Another process may already hold that port. Try --port auto.");
+            System.exit(EXIT_PORT_UNAVAILABLE);
+            return;
+        }
         int actual = app.port();
+        server.setBindPort(actual);
         var url = "http://" + bind.getHostAddress() + ":" + actual + "/";
         if (server.keyMaterial() != null) url += "#key=" + server.keyB64Url();
 
@@ -62,7 +112,7 @@ public final class Main {
                 System.out.println("PIN: " + pin);
             } catch (Exception e) {
                 System.err.println("postcard: --pin wiring failed: " + e.getMessage());
-                System.exit(1);
+                System.exit(EXIT_PIN_FAILED);
             }
         }
 
@@ -86,6 +136,10 @@ public final class Main {
             if (!tornDown.compareAndSet(false, true)) return;
             try { app.jettyServer().stop(); } catch (Exception _) {}   // stop accepting connections
             Shutdown.drain(3, () -> {}, () -> server.hub().close());   // drain in-flight, close hub
+            // Spooled upload bodies live under the shared directory. In --path mode that
+            // directory is the user's own and must survive, but the spool must not.
+            server.sweepUploadSpool();
+            try { java.nio.file.Files.deleteIfExists(server.uploadSpoolDir()); } catch (Exception _) {}
             if (server.tempDir()) deleteTree(server.store().dir());
             log.info("postcard: goodbye");
         };

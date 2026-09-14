@@ -154,6 +154,23 @@ val buildWeb = tasks.register<Exec>("buildWeb") {
     commandLine(pnpmCmd, "--filter", "@postcard/web", "build")
 }
 tasks.named("compileJava") { dependsOn(buildWeb) }
+// The version --version prints comes from the Gradle version, not a literal in an annotation,
+// so a release cannot ship a binary that disagrees with its own tag.
+val generateVersionResource by tasks.registering {
+    description = "Write the project version where PostcardOptions can read it back"
+    val outputDir = layout.buildDirectory.dir("generated/version")
+    val projectVersion = version.toString()
+    inputs.property("version", projectVersion)
+    outputs.dir(outputDir)
+    doLast {
+        val f = outputDir.get().asFile.resolve("postcard-version.properties")
+        f.parentFile.mkdirs()
+        f.writeText("version=$projectVersion\n")
+    }
+}
+
+sourceSets.named("main") { resources.srcDir(generateVersionResource) }
+
 tasks.named("shadowJar") { dependsOn(buildWeb) }
 tasks.named("nativeCompile") { dependsOn(buildWeb) }
 
