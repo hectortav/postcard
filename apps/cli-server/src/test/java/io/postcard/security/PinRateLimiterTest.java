@@ -229,44 +229,83 @@ class PinRateLimiterTest {
     }
 
     @Test
-    void recordFailureAfterLockoutExpiresReEntersLockout() {
-        // The TF branch of the lockout guard: lockedUntilEpochMs is set but
-        // expired. A new failure should re-arm the lockout, not extend the
-        // old one.
+    void aFailureAfterAnExpiredLockoutStartsACleanSlate() {
+        // The lockout guard with lockedUntilEpochMs set but expired. This test previously
+        // asserted that a single failure re-locked the address immediately -- which is the
+        // bug, not the contract: three strikes buys fifteen minutes, and serving that
+        // sentence has to buy the three strikes back, or one mistyped PIN locks a device out
+        // of the session for good.
         var clock = new FakeClock(Instant.parse("2026-01-01T00:00:00Z"));
         var limiter = new PinRateLimiter(clock);
         for (int i = 0; i < PinRateLimiter.MAX_FAILS; i++) limiter.recordFailure("1.2.3.4");
         assertTrue(limiter.isLocked("1.2.3.4"));
         clock.advance(PinRateLimiter.LOCKOUT.plusSeconds(1));
-        // isLocked returns false now (no auto-cleanup, just returns false)
         assertFalse(limiter.isLocked("1.2.3.4"));
-        // recordFailure hits the TF branch — lockedUntil != 0 but now >= lockedUntil.
+
         var r = limiter.recordFailure("1.2.3.4");
-        // After re-arming, the IP is locked again with a fresh window.
-        assertFalse(r.allowed());
-        assertTrue(limiter.isLocked("1.2.3.4"));
+        assertTrue(r.allowed(), "one failure after the wait must not re-lock");
+        assertEquals(PinRateLimiter.MAX_FAILS - 1, r.remainingAttempts());
+        assertFalse(limiter.isLocked("1.2.3.4"));
     }
 
     @Test
-    void peekRemainingAfterLockoutExpiredReturnsZero() {
-        // TF branch in peekRemaining: lockedUntil set but expired.
+    void peekRemainingReportsTheAllowanceThroughTheLockoutCycle() {
         var clock = new FakeClock(Instant.parse("2026-01-01T00:00:00Z"));
         var limiter = new PinRateLimiter(clock);
-        for (int i = 0; i < PinRateLimiter.MAX_FAILS; i++) limiter.recordFailure("1.2.3.4");
-        clock.advance(PinRateLimiter.LOCKOUT.plusSeconds(1));
-        // The entry's `fails` is still >= MAX_FAILS, so peekRemaining returns 0
-        // because of the `a.fails >= MAX_FAILS` check, not the lockedUntil check.
-        // The TF branch on the `lockedUntilEpochMs != 0L && clock.millis() < a.lockedUntilEpochMs`
-        // is the missed one — exercised when the clock is in the gap.
-        // We just need a different IP that reaches the inner check.
-        limiter.recordFailure("5.6.7.8"); // fails = 1, lockedUntil = 0 → FT branch
+        assertEquals(PinRateLimiter.MAX_FAILS, limiter.peekRemaining("5.6.7.8"));
+
+        limiter.recordFailure("5.6.7.8");
         assertEquals(PinRateLimiter.MAX_FAILS - 1, limiter.peekRemaining("5.6.7.8"));
-        // Now arm the lockout on this IP.
+
         for (int i = 1; i < PinRateLimiter.MAX_FAILS; i++) limiter.recordFailure("5.6.7.8");
-        // Locked → 0
-        assertEquals(0, limiter.peekRemaining("5.6.7.8"));
-        // Advance past expiry. peekRemaining still returns 0 because fails >= MAX.
+        assertEquals(0, limiter.peekRemaining("5.6.7.8"), "locked out: nothing left");
+
+        // Once the window passes the counter is spent, so the UI must stop telling the user
+        // they have no attempts left. It used to report 0 forever.
         clock.advance(PinRateLimiter.LOCKOUT.plusSeconds(1));
-        assertEquals(0, limiter.peekRemaining("5.6.7.8"));
+        assertEquals(PinRateLimiter.MAX_FAILS, limiter.peekRemaining("5.6.7.8"));
+    }
+
+    @Test void servingTheLockoutRestoresTheFullAllowance() {
+        // The bug: fails stayed at MAX_FAILS through the lockout, so the very first attempt
+        // after waiting out fifteen minutes tripped the limit again -- an effectively
+        // permanent lockout for anyone who mistyped three times once.
+        var clock = new FakeClock(Instant.parse("2026-01-01T00:00:00Z"));
+        var limiter = new PinRateLimiter(clock);
+        for (int i = 0; i < PinRateLimiter.MAX_FAILS; i++) limiter.recordFailure("10.0.0.9");
+        assertTrue(limiter.isLocked("10.0.0.9"));
+
+        clock.advance(PinRateLimiter.LOCKOUT.plusSeconds(1));
+        assertFalse(limiter.isLocked("10.0.0.9"));
+        assertEquals(PinRateLimiter.MAX_FAILS, limiter.peekRemaining("10.0.0.9"),
+            "the allowance is restored once the lockout expires");
+
+        var first = limiter.recordFailure("10.0.0.9");
+        assertTrue(first.allowed(), "one wrong PIN after the wait must not re-lock");
+        assertEquals(PinRateLimiter.MAX_FAILS - 1, first.remainingAttempts());
+        var second = limiter.recordFailure("10.0.0.9");
+        assertTrue(second.allowed());
+        var third = limiter.recordFailure("10.0.0.9");
+        assertFalse(third.allowed(), "and the third still locks");
+    }
+
+    @Test void theTrackedAddressMapIsBounded() {
+        var clock = new FakeClock(Instant.parse("2026-01-01T00:00:00Z"));
+        var limiter = new PinRateLimiter(clock);
+        for (int i = 0; i < PinRateLimiter.MAX_TRACKED_IPS + 500; i++) {
+            limiter.recordFailure("10." + (i / 65536) + "." + ((i / 256) % 256) + "." + (i % 256));
+        }
+        assertTrue(limiter.size() <= PinRateLimiter.MAX_TRACKED_IPS, "tracked: " + limiter.size());
+    }
+
+    @Test void lockedAddressesSurviveEviction() {
+        var clock = new FakeClock(Instant.parse("2026-01-01T00:00:00Z"));
+        var limiter = new PinRateLimiter(clock);
+        for (int i = 0; i < PinRateLimiter.MAX_FAILS; i++) limiter.recordFailure("10.9.9.9");
+        assertTrue(limiter.isLocked("10.9.9.9"));
+        for (int i = 0; i < PinRateLimiter.MAX_TRACKED_IPS + 500; i++) {
+            limiter.recordFailure("172.16." + ((i / 256) % 256) + "." + (i % 256));
+        }
+        assertTrue(limiter.isLocked("10.9.9.9"), "an attacker must not clear their lockout by flooding");
     }
 }
