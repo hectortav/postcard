@@ -34,6 +34,10 @@ jobs:
         with:
           version: 9.7.0
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -48,6 +52,20 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-release-
             gradle-${{ runner.os }}-
+
+      - name: Check the tag matches the project version
+        shell: bash
+        run: |
+          # The tag used to be cut by hand with nothing comparing it to the version in the
+          # build, so v0.0.2 shipped binaries reporting 0.1.0.
+          project=$(grep -m1 '^version = ' apps/cli-server/build.gradle.kts | sed -E 's/.*"(.*)".*/\1/')
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "$project" != "$tag" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match the project version $project."
+            echo "Run: node scripts/bump-version.mjs $tag"
+            exit 1
+          fi
+          echo "version $project matches tag $GITHUB_REF_NAME"
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm turbo run build
@@ -74,9 +92,11 @@ jobs:
           # .dmg / .msi / .deb live at the top of dist/installer; the
           # app-image dir is a sibling of equal interest to anyone who
           # wants the binary without an installer wrapper.
-          path: |
-            apps/cli-server/build/dist/installer/*
-            apps/cli-server/build/dist/app-image/*
+          # `build/dist/app-image/*` used to be listed here and matched nothing: the app
+          # image is written to dist/postcard.app (macOS) or dist/postcard. It survived only
+          # because a second path made upload-artifact keep the `dist/` prefix that the
+          # publish job's glob relied on, so removing it means naming the real path below.
+          path: apps/cli-server/build/dist/installer/*
           if-no-files-found: error
 
   # Publish the installers as an actual GitHub Release. Without this the workflow only
@@ -90,11 +110,23 @@ jobs:
     permissions:
       contents: write
     steps:
+      # Needed for CHANGELOG.md, which supplies the release notes.
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
           pattern: postcard-installer-*
           merge-multiple: true
+
+      - name: Checksum every artifact
+        run: |
+          # Without this there is nothing to verify a download against. GitHub records a
+          # per-asset digest, but nothing publishes it next to the files.
+          cd artifacts
+          find . -type f ! -name 'SHASUMS256.txt' -exec shasum -a 256 {} + \
+            | sed 's| \./| |' > SHASUMS256.txt
+          cat SHASUMS256.txt
 
       - name: Create the GitHub Release
         env:
@@ -102,11 +134,28 @@ jobs:
         run: |
           # Not a draft and not a prerelease: /releases/latest, which the landing page
           # queries, skips both.
-          gh release create "$GITHUB_REF_NAME" \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "postcard $GITHUB_REF_NAME" \
-            --generate-notes \
-            artifacts/installer/*
+          notes=$(mktemp)
+          if [ -f CHANGELOG.md ]; then
+            # Everything under this version's heading, up to the next one.
+            awk -v tag="${GITHUB_REF_NAME#v}" '
+              $0 ~ "^## \\[?" tag {found=1; next}
+              found && /^## / {exit}
+              found {print}
+            ' CHANGELOG.md > "$notes"
+          fi
+          if [ -s "$notes" ]; then
+            gh release create "$GITHUB_REF_NAME" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "postcard $GITHUB_REF_NAME" \
+              --notes-file "$notes" \
+              artifacts/*
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "postcard $GITHUB_REF_NAME" \
+              --generate-notes \
+              artifacts/*
+          fi
 
   pages:
     name: deploy-landing-page
