@@ -11,7 +11,10 @@ export default defineConfig({
   workers: 1,
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
-    baseURL: process.env.POSTCARD_LANDING_E2E_URL ?? 'http://localhost:4173',
+    // The site is built with `base: '/postcard/'` for GitHub Pages, so `vite preview` serves
+    // it under that prefix and the root is a 404. This suite never ran in CI, which is how a
+    // baseURL pointing at the wrong path went unnoticed.
+    baseURL: process.env.POSTCARD_LANDING_E2E_URL ?? 'http://localhost:4173/postcard/',
     trace: 'on-first-retry',
   },
   projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],

@@ -1,31 +1,32 @@
 import { test, expect } from '@playwright/test';
 
-test('landing page renders all sections and airmail stripe', async ({ page }) => {
+test('landing page renders all its sections', async ({ page }) => {
   // The Playwright config supplies a webServer that runs `pnpm preview`.
   await page.goto('/');
 
-  // Airmail stripe — repeated red/navy/red gradient at the top of the page.
-  // The element is 4px tall and full-width of the header; we check for its
-  // presence and a non-empty computed background-image (a gradient).
-  // Use toBeAttached (not toBeVisible) because the div has no children
-  // and Playwright's visibility heuristic can mis-classify empty
-  // presentational divs.
-  const stripe = page.locator('header [aria-hidden="true"]').first();
-  await expect(stripe).toBeAttached();
-  const box = await stripe.boundingBox();
+  // The decorative postcard in the hero. This used to assert an "airmail stripe" with a
+  // repeating-linear-gradient background, which the letterpress redesign removed: the
+  // assertion had been failing ever since, unnoticed, because this suite never ran in CI.
+  const decoration = page.locator('header [aria-hidden="true"]').first();
+  await expect(decoration).toBeAttached();
+  const box = await decoration.boundingBox();
   expect(box?.height).toBeGreaterThan(0);
-  const bg = await stripe.evaluate((el) => getComputedStyle(el).backgroundImage);
-  expect(bg).toMatch(/repeating-linear-gradient/);
+  // The stamp is an inline SVG, so it proves the decoration actually rendered rather than
+  // collapsing to an empty box.
+  await expect(decoration.locator('svg').first()).toBeAttached();
 
   // Hero headline.
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
     /send a file across the room/,
   );
 
-  // Three feature cards.
-  await expect(page.getByText('Local-first')).toBeVisible();
-  await expect(page.getByText('Encrypted')).toBeVisible();
-  await expect(page.getByText('Cross-platform')).toBeVisible();
+  // Three feature cards. Scoped to their own section and matched as headings: "Cross-platform"
+  // also appears twice in the comparison table below, so a bare text match resolves to three
+  // elements and fails on strict mode.
+  const features = page.locator('section[aria-labelledby="features-heading"]');
+  for (const title of ['Local-first', 'Encrypted', 'Cross-platform']) {
+    await expect(features.getByRole('heading', { level: 3, name: title })).toBeVisible();
+  }
 
   // Terminal block.
   await expect(page.getByText(/postcard --path/)).toBeVisible();
