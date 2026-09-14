@@ -2,9 +2,12 @@ import { describe, it, expect, vi } from 'vitest';
 import { fetchLatestRelease, classifyAsset } from './fetchRelease';
 
 describe('classifyAsset', () => {
-  it('maps dmg/exe/appimage/deb to mac/win/linux/linux', () => {
+  it('maps dmg/msi/exe/appimage/deb to mac/win/win/linux/linux', () => {
     expect(classifyAsset('postcard-0.1.0.dmg')).toBe('mac');
     expect(classifyAsset('postcard-0.1.0-x86_64.dmg')).toBe('mac');
+    // .msi is what `jpackageMsi` produces and therefore what every release actually
+    // contains; the fixture below used a .exe name the build has never emitted.
+    expect(classifyAsset('postcard-1.0.msi')).toBe('win');
     expect(classifyAsset('postcard-setup-0.1.0.exe')).toBe('win');
     expect(classifyAsset('postcard-0.1.0.AppImage')).toBe('linux');
     expect(classifyAsset('postcard_0.1.0_amd64.deb')).toBe('linux');
@@ -34,7 +37,7 @@ describe('fetchLatestRelease', () => {
       html_url: 'https://github.com/hectortav/postcard/releases/tag/v0.1.0',
       assets: [
         { name: 'postcard-0.1.0.dmg', browser_download_url: 'https://x/mac.dmg', size: 4_000_000 },
-        { name: 'postcard-setup-0.1.0.exe', browser_download_url: 'https://x/win.exe', size: 3_000_000 },
+        { name: 'postcard-1.0.msi', browser_download_url: 'https://x/win.msi', size: 3_000_000 },
         { name: 'postcard-0.1.0.AppImage', browser_download_url: 'https://x/linux.AppImage', size: 5_000_000 },
         { name: 'postcard-0.1.0.tar.gz', browser_download_url: 'https://x/src.tar.gz', size: 100_000 },
       ],
@@ -46,7 +49,7 @@ describe('fetchLatestRelease', () => {
     expect(r?.assets).toHaveLength(3);
     const byOs = Object.fromEntries(r!.assets.map((a) => [a.os, a] as const));
     expect(byOs.mac?.name).toBe('postcard-0.1.0.dmg');
-    expect(byOs.win?.name).toBe('postcard-setup-0.1.0.exe');
+    expect(byOs.win?.name).toBe('postcard-1.0.msi');
     expect(byOs.linux?.name).toBe('postcard-0.1.0.AppImage');
   });
 

@@ -47,7 +47,7 @@ describe('Download', () => {
       html_url: 'https://github.com/hectortav/postcard/releases/tag/v0.1.0',
       assets: [
         { name: 'postcard-0.1.0.dmg', browser_download_url: 'https://x/mac.dmg', size: 4_000_000 },
-        { name: 'postcard-setup-0.1.0.exe', browser_download_url: 'https://x/win.exe', size: 3_000_000 },
+        { name: 'postcard-1.0.msi', browser_download_url: 'https://x/win.msi', size: 3_000_000 },
         { name: 'postcard-0.1.0.AppImage', browser_download_url: 'https://x/linux.AppImage', size: 5_000_000 },
       ],
     };
@@ -94,7 +94,7 @@ describe('Download', () => {
       html_url: 'https://github.com/hectortav/postcard/releases/tag/v0.1.0',
       assets: [
         { name: 'postcard-0.1.0.dmg', browser_download_url: 'https://x/mac.dmg', size: 900 },
-        { name: 'postcard-setup-0.1.0.exe', browser_download_url: 'https://x/win.exe', size: 2048 },
+        { name: 'postcard-1.0.msi', browser_download_url: 'https://x/win.msi', size: 2048 },
         { name: 'postcard-0.1.0.deb', browser_download_url: 'https://x/linux.deb', size: 6_291_456 },
       ],
     };
