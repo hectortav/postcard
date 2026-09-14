@@ -1,0 +1,23 @@
+name: Feature request
+description: Something postcard could do
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do
+      description: The situation, rather than the feature. It may already be possible.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you have in mind
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - label: >
+            I have read the non-goals in the README (no cloud, no accounts, nothing leaves the
+            network) and this fits inside them.

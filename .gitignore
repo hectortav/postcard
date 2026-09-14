@@ -68,3 +68,7 @@ apps/cli-server/icons/png/
 # Superpowers working notes (specs, plans, skill state). Kept locally, never committed.
 .superpowers/
 docs/superpowers/
+
+# Local-only history tooling. Publishing a script that redistributes commit timestamps in the
+# repository it was run on invites exactly the reading it disclaims, whatever its header says.
+scripts/rewrite-history.sh

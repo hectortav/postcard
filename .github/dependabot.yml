@@ -1,0 +1,24 @@
+version: 2
+updates:
+  # postcard bundles a full Chromium and a JDK and has no auto-update, so a shipped installer
+  # carries whatever it was built with until someone downloads a new one. Nothing was watching
+  # these: GitHub's vulnerability alerts were switched off and no bot was configured.
+  - package-ecosystem: gradle
+    directory: /apps/cli-server
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      dev-tooling:
+        patterns: ['@types/*', 'vitest', '@vitest/*', 'happy-dom', 'oxlint', 'prettier', 'turbo']
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

@@ -27,27 +27,30 @@ the page, copy the link.
 
 ## Flags
 
-| Flag | Default | Notes |
-|---|---|---|
-| `-p, --port` | 8080 | `auto` for :0 fallback |
-| `-h, --host` | auto | bind override |
-| `-d, --path` | temp dir | directory to share |
-| `-e, --encrypt` | off | AES-256-GCM, key in URL hash |
-| `--pin [code]` | off | 4-digit PIN gates `/api/files` and `/api/download/{id}`. Auto-generates a PIN if no value is given; the PIN mixes into the AES-256 key derivation (PBKDF2-HMAC-SHA256, 200k iter). 3 wrong attempts from the same IP lock that IP out for 15 min. The dashboard's PIN protection section can enable, change or disable the PIN at runtime (host computer only; receivers never see it). |
-| `--no-browser` | off | start without opening the dashboard window (the tray can still open it, and no Chromium is loaded until it does) |
-| `--headless` | off | daemon mode: no tray icon, no auto-browser |
-| `--max-upload <MiB>` | unbounded | pre-disk enforcement |
-| `--auth-token` | none | optional WS handshake secret |
+| Flag                   | Default   | Notes                                                                                                                                                                                                                                                                                                                                                                                   |
+| ---------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `-p, --port`           | 8080      | `auto` for :0 fallback                                                                                                                                                                                                                                                                                                                                                                  |
+| `-h, --host`           | auto      | bind override                                                                                                                                                                                                                                                                                                                                                                           |
+| `-d, --path`           | temp dir  | directory to share                                                                                                                                                                                                                                                                                                                                                                      |
+| `-e, --encrypt`        | off       | AES-256-GCM, key in the URL fragment. Receivers decrypt in the browser; see [Encryption](#encryption).                                                                                                                                                                                                                                                                                  |
+| `--encrypt-owner`      | off       | Encrypt the host's own downloads too. By default the host is served plaintext: it already has the file on disk, its own requests never reach the network, and this keeps resume support for the one device likely to hold large files.                                                                                                                                                  |
+| `--pin [code]`         | off       | 4-digit PIN gates `/api/files` and `/api/download/{id}`. Auto-generates a PIN if no value is given; the PIN mixes into the AES-256 key derivation (PBKDF2-HMAC-SHA256, 200k iter). 3 wrong attempts from the same IP lock that IP out for 15 min. The dashboard's PIN protection section can enable, change or disable the PIN at runtime (host computer only; receivers never see it). |
+| `--no-browser`         | off       | start without opening the dashboard window (the tray can still open it, and no Chromium is loaded until it does)                                                                                                                                                                                                                                                                        |
+| `--headless`           | off       | daemon mode: no tray icon, no auto-browser                                                                                                                                                                                                                                                                                                                                              |
+| `--max-upload <MiB>`   | unbounded | Enforced by the server before a byte reaches disk.                                                                                                                                                                                                                                                                                                                                      |
+| `--auth-token`         | none      | Optional WebSocket handshake secret. Prefer `POSTCARD_AUTH_TOKEN`: a command-line value is visible in `ps` to every user on the machine.                                                                                                                                                                                                                                                |
+| `--help` / `--version` |           | Print and exit without starting a server.                                                                                                                                                                                                                                                                                                                                               |
 
-The dashboard opens in a window postcard owns, rendered by an embedded Chromium
-(JCEF) bundled inside the app — no external browser is launched, and the natives
-ship in the installer so a first launch works with no network. **Closing that
+The dashboard opens in a window postcard owns. On macOS that window is the system
+WebKit view, which is part of the operating system and bundles nothing. On Windows
+and Linux it is an embedded Chromium (JCEF) shipped inside the app, so a first
+launch works with no network. Either way no external browser is launched. **Closing that
 window quits postcard**, including any transfer a phone still has in flight.
 Bundling Chromium is why the installers are large (the macOS app image is ~458 MB
 before compression).
 
 When a tray icon is available, postcard shows a desktop notification whenever
-*another* device uploads a file or downloads one of yours. Your own uploads and
+_another_ device uploads a file or downloads one of yours. Your own uploads and
 downloads stay silent, and `--headless` disables notifications entirely.
 `--headless` also skips the window and never initializes Chromium.
 
@@ -77,6 +80,7 @@ bundler, so the task pins the bundle to `1.0` while the project version stays
 at `0.x` for marketing.
 
 Notes:
+
 - The `.dmg` / `.msi` are **unsigned**; first-launch Gatekeeper / SmartScreen
   warnings are expected. Code signing is a v0.2+ concern.
 - The bundled JRE is the full JDK 25 runtime (~170 MB on disk before DMG
@@ -84,12 +88,22 @@ Notes:
 
 ## Release workflow
 
-[`.github/workflows/release.yml`](.github/workflows/release.yml) builds the
-platform installers on every `v*.*.*` tag push and uploads them as
-`postcard-installer-{ubuntu,macos,windows}` artifacts. The GitHub Pages
-deploy step is scaffolded (commented out) at the bottom of the file —
-uncomment it when the first hand-cut tag is ready and the landing page
-should go live alongside the installers.
+[`.github/workflows/release.yml`](.github/workflows/release.yml) runs on every
+`v*.*.*` tag push. It checks the tag against the version in
+`apps/cli-server/build.gradle.kts`, builds the three platform installers, publishes
+them as a GitHub Release with a `SHASUMS256.txt` beside them, and deploys the
+landing page to GitHub Pages.
+
+Cutting a release:
+
+```bash
+node scripts/bump-version.mjs 0.2.0   # every package.json plus build.gradle.kts
+# update CHANGELOG.md under a "## [0.2.0]" heading, commit, then:
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+The release notes come from that CHANGELOG section when it exists, and from the
+commit list otherwise.
 
 ## Debugging with Spotlight
 
@@ -134,18 +148,44 @@ just failed?" is answerable without pasting a stack trace.
 
 > **Version pin.** The root `package.json` pins `hono` to `4.12.31` via `pnpm.overrides`. Spotlight
 > 4.11.8's request middleware calls `ctx.req.query().toString()`, and hono `4.12.34+` changed
-> `query()` to return a null-prototype object, which has no `toString`. The mismatch makes *every*
+> `query()` to return a null-prototype object, which has no `toString`. The mismatch makes _every_
 > sidecar route return 500 — the UI, envelope ingest and the MCP endpoint alike — while the process
 > still looks healthy in `ps`. The MCP server is launched through `pnpm exec` rather than
 > `npx @spotlightjs/spotlight@latest` for the same reason: npx resolves its own unpinned tree and
 > would reintroduce the broken pairing. Revisit when Spotlight releases a fix.
 
+## Encryption
+
+With `--encrypt`, downloads are AES-256-GCM: a 12-byte nonce and a 16-byte tag per
+64 KiB plaintext chunk, with the chunk index, a final-chunk flag and the file id
+authenticated alongside so chunks cannot be reordered, truncated, or moved between
+files. The key lives in the URL fragment and never reaches the server.
+
+Receivers decrypt in the browser. Two consequences worth knowing:
+
+- **No resume.** Each chunk carries its own nonce and tag, so a byte range is not
+  independently decryptable and the server does not offer `Range` for an encrypted
+  download. An interrupted transfer starts again from zero.
+- **A memory ceiling.** postcard serves over plain HTTP on a local address, which
+  browsers do not treat as a secure context, so the two APIs that stream a generated
+  file to disk are unavailable: Service Workers and the File System Access API are
+  both gated on a secure context, and the latter does not exist on iOS Safari at
+  all. The file is therefore decrypted into memory. It is flushed to the browser in
+  slabs so the tab is not holding all of it, which carries a large file comfortably
+  on a laptop, but a phone will give up well before one does. The dashboard warns
+  above 512 MiB. The host's own window is unaffected: it is served plaintext.
+
 ## Security
 
-- **Encryption** (`--encrypt` / `--pin`): AES-256-GCM, 12-byte nonce + 16-byte
-  tag per 64 KiB plaintext chunk. Key in URL hash, never on the wire. The
-  PIN is mixed into the key via PBKDF2-HMAC-SHA256 (200k iterations) so
-  knowing the URL alone is insufficient to decrypt the file stream.
+- **PIN** (`--pin`): mixed into the key with PBKDF2-HMAC-SHA256 at 200,000
+  iterations, so knowing the URL is not enough to decrypt the stream. Verifying it
+  authorizes that one client, not every device on the network.
+- **Sharing the link shares the PIN.** `--pin` writes the PIN into the URL fragment
+  so a QR code carries everything a receiver needs. If that matters, read the PIN
+  from the terminal aloud instead of forwarding the link.
+- **A PIN on the command line is visible in `ps`** to every user on the machine. Use
+  `POSTCARD_PIN`, or pass `--pin` with no value and read the generated one from
+  stdout.
 - **Rate limit**: per-IP, 3 wrong PINs → 15-minute lockout (returns 429 with
   `lockoutMsRemaining` so the UI can show a countdown).
 - **No WebCrypto, by necessity**: postcard serves from `http://<lan-ip>:<port>`,
@@ -157,9 +197,35 @@ just failed?" is answerable without pasting a stack trace.
   generated from the Java side so the two implementations cannot drift apart.
   (Desktop notifications hit the same wall, which is why they are delivered
   through the tray icon rather than the Notification API.)
-- **Coverage gate**: new `io.postcard.security.*` code is held to 100% line +
-  branch coverage by the `coverage` CI job; the rest of the repo is held
-  to 90% (JaCoCo + Vitest thresholds).
+- **Coverage gate**: `io.postcard.security.*` is held to 100% by the `coverage` CI
+  job, apart from `PinSecurityEngine`'s two unreachable `NoSuchAlgorithmException`
+  catches. The Java bundle floor is 70% line and 60% branch, and the two web
+  bundles are gated at 88% lines / 75% branches and 85% respectively. Those are
+  the numbers CI enforces; they ratchet as coverage rises.
+
+- **Same-origin only**: state-changing requests and WebSocket upgrades must present
+  the dashboard's own origin, and the `Host` header must name the bind address, a
+  loopback address, or an mDNS `.local` name.
 
 See [`apps/cli-server/src/main/java/io/postcard/security/`](apps/cli-server/src/main/java/io/postcard/security/)
-for the PIN-security implementation.
+for the PIN implementation, and [SECURITY.md](SECURITY.md) for the threat model and
+how to report a vulnerability.
+
+## Exit codes
+
+| Code | Meaning                                    |
+| ---- | ------------------------------------------ |
+| 0    | Normal shutdown, or `--help` / `--version` |
+| 1    | Unexpected error                           |
+| 2    | Bad command line                           |
+| 3    | The address and port could not be bound    |
+| 4    | No LAN address to serve on                 |
+| 5    | `--pin` could not be armed                 |
+
+## When there is no network
+
+If no usable LAN address is found, postcard tries to bring up a hotspot (Linux only,
+via `nmcli`) and serves from there; the QR code then carries the Wi-Fi credentials so
+a phone can join by scanning. Elsewhere it exits with instructions and the suggestion
+to name an address yourself with `--host`. postcard never tears a hotspot down for
+you: it prints the command to do it.
