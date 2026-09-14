@@ -21,6 +21,7 @@
 #import <WebKit/WebKit.h>
 #import <jni.h>
 #import <objc/runtime.h>
+#include <unistd.h>
 
 #import "io_postcard_desktop_MacWebview.h"
 
@@ -33,6 +34,8 @@ static jmethodID gDownloadDestination;
 static jmethodID gOnDownloadComplete;
 static jmethodID gOnWindowClosed;
 static jmethodID gOnFirstLoad;
+static jmethodID gOnQuitRequested;
+static id gAppDelegate;
 static BOOL gFirstLoadFired = NO;
 // Set while AppKit is tearing the window down on its own (the red close button). Java's
 // shutdown path also calls closeWindow, and closing a window from inside its own
@@ -221,6 +224,45 @@ static jstring nsStringToJstr(JNIEnv *env, NSString *s) {
 }
 @end
 
+@interface PostcardAppDelegate : NSObject <NSApplicationDelegate>
+@end
+
+@implementation PostcardAppDelegate
+
+/**
+ * Cmd-Q, the Dock menu's Quit, and "Quit postcard" from the menu bar all arrive here.
+ *
+ * Without a delegate of our own, macOS terminates the process outright: no drain, no tray
+ * removal, no deleting the temporary share directory, and any transfer in flight dies
+ * unannounced. AWT's own quit handler reports itself installed but never sees the event,
+ * because thread 0 is inside our [NSApp run] rather than AWT's.
+ *
+ * Answering NSTerminateCancel hands control back to postcard, which then ends the process
+ * itself once the teardown is done.
+ */
+- (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender {
+    (void)sender;
+    JNIEnv *env = attachMain();
+    if (env && gHost && gOnQuitRequested) {
+        (*env)->CallVoidMethod(env, gHost, gOnQuitRequested);
+        if ((*env)->ExceptionCheck(env)) (*env)->ExceptionClear(env);
+    }
+    return NSTerminateCancel;
+}
+
+/** A Dock click on the running app. Raises the window rather than doing nothing. */
+- (BOOL)applicationShouldHandleReopen:(NSApplication *)sender hasVisibleWindows:(BOOL)visible {
+    (void)sender; (void)visible;
+    if (gWin) {
+        if ([NSApp isHidden]) [NSApp unhide:nil];
+        if ([gWin isMiniaturized]) [gWin deminiaturize:nil];
+        [gWin makeKeyAndOrderFront:nil];
+        [NSApp activateIgnoringOtherApps:YES];
+    }
+    return YES;
+}
+@end
+
 static void cacheHostMethods(JNIEnv *env, jobject hostGlobal) {
     // Takes ownership of hostGlobal (a global ref created on the calling thread:
     // local refs must never cross the dispatch boundary into thread 0).
@@ -237,6 +279,44 @@ static void cacheHostMethods(JNIEnv *env, jobject hostGlobal) {
         "onWindowClosed", "()V");
     gOnFirstLoad = (*env)->GetMethodID(env, hostCls,
         "onFirstLoad", "()V");
+    gOnQuitRequested = (*env)->GetMethodID(env, hostCls,
+        "onQuitRequested", "()V");
+}
+
+/*
+ * Class:     io_postcard_desktop_MacWebview
+ * Method:    terminateNow
+ */
+JNIEXPORT void JNICALL Java_io_postcard_desktop_MacWebview_terminateNow(
+        JNIEnv *env, jclass cls) {
+    (void)env; (void)cls;
+    // End the process here, without unwinding AppKit or running atexit handlers.
+    //
+    // By the time this is called postcard's own teardown has finished and said so: the server
+    // is stopped, transfers are drained, the hub is closed and a temporary share directory is
+    // already deleted. What is left is only the runtime's own exit path, and that is the part
+    // that misbehaves. Asking the event loop to return does not work once AWT is up for the
+    // tray icon -- AWT takes over the main run loop, so -stop: never brings our [NSApp run]
+    // back and the app sat for two seconds waiting for it. Unwinding through exit() instead
+    // is what the earlier design found could hang for seconds inside the ObjC runtime lock.
+    //
+    // _exit is the one option with no waiting in it.
+    _exit(0);
+}
+
+/*
+ * Class:     io_postcard_desktop_MacWebview
+ * Method:    installAppDelegate
+ */
+JNIEXPORT void JNICALL Java_io_postcard_desktop_MacWebview_installAppDelegate(
+        JNIEnv *env, jclass cls) {
+    (void)env; (void)cls;
+    runOnMain(^{
+        // Installed after the tray is up, deliberately. Initialising AWT sets an application
+        // delegate of its own, so claiming this any earlier just gets overwritten.
+        if (!gAppDelegate) gAppDelegate = [[PostcardAppDelegate alloc] init];
+        [NSApp setDelegate:gAppDelegate];
+    });
 }
 
 /*
@@ -323,13 +403,21 @@ JNIEXPORT void JNICALL Java_io_postcard_desktop_MacWebview_runEventLoop(
 JNIEXPORT void JNICALL Java_io_postcard_desktop_MacWebview_stopEventLoop(
         JNIEnv *env, jclass cls) {
     (void)env; (void)cls;
-    // stop: alone only takes effect once the loop wakes; the dummy event makes
-    // Ctrl-C shutdown prompt even when nothing else is queued.
-    [NSApp stop:nil];
-    NSEvent *dummy = [NSEvent otherEventWithType:NSEventTypeApplicationDefined
-        location:NSZeroPoint modifierFlags:0 timestamp:0
-        windowNumber:0 context:nil subtype:0 data1:0 data2:0];
-    [NSApp postEvent:dummy atStart:NO];
+    // On the main queue, not the calling thread. NSApp is AppKit state and -stop: from a
+    // background thread is simply ignored -- which is what made closing the window take two
+    // seconds: the quit sequence calls this from its teardown thread, the loop never came
+    // back, and the process sat until the Java-side fallback timer gave up and halted it.
+    //
+    // async, not sync: the caller may be a thread the main thread is itself waiting on.
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [NSApp stop:nil];
+        // -stop: only takes effect once the loop finishes dispatching an event, so give it
+        // one even when nothing else is queued.
+        NSEvent *dummy = [NSEvent otherEventWithType:NSEventTypeApplicationDefined
+            location:NSZeroPoint modifierFlags:0 timestamp:0
+            windowNumber:0 context:nil subtype:0 data1:0 data2:0];
+        [NSApp postEvent:dummy atStart:NO];
+    });
 }
 
 /*

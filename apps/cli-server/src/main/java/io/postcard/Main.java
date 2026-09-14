@@ -179,19 +179,19 @@ public final class Main {
                 },
                 QUIT_GRACE_MILLIS,
                 macWindow
-                    // Leaving from a background thread while thread 0 is inside [NSApp run]
-                    // is what made quitting hang for seconds and, often enough, crash. Unpark
-                    // thread 0 instead and let main() finish the exit there.
+                    // Teardown has already finished by the time this runs, so there is
+                    // nothing left to wait for. Earlier revisions asked the AppKit event loop
+                    // to return and then exited from main; that never came back once AWT was
+                    // up for the tray, so every window close sat on a two-second fallback
+                    // timer before giving up. See MacWebview.terminateNow.
                     ? () -> {
-                        try { io.postcard.desktop.MacWebview.stopEventLoop(); } catch (Throwable _) {}
-                        var fallback = new Thread(() -> {
-                            try { Thread.sleep(2_000); } catch (InterruptedException _) { return; }
-                            // AppKit never came back. Cleanup has already run, so go.
-                            log.warn("postcard: the event loop did not stop; leaving now");
+                        try {
+                            io.postcard.desktop.MacWebview.terminateNow();
+                        } catch (Throwable t) {
+                            // No native library, or it refused to load. Leave the ordinary way.
+                            log.warn("postcard: leaving without the native exit ({})", t.getMessage());
                             Runtime.getRuntime().halt(0);
-                        }, "postcard-exit-fallback");
-                        fallback.setDaemon(true);
-                        fallback.start();
+                        }
                     }
                     : () -> System.exit(0));
             final Runnable quit = quitSequence::request;

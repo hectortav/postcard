@@ -42,6 +42,14 @@ public final class MacWebview {
 
         /** The first page load completed; safe to initialize AWT now. Fires once. */
         void onFirstLoad();
+
+        /**
+         * The user asked the platform to quit: Cmd-Q, the Dock menu, or the menu bar.
+         *
+         * <p>Answered by postcard's own shutdown rather than by letting macOS terminate the
+         * process, which would skip the drain and leave the temporary share directory behind.
+         */
+        void onQuitRequested();
     }
 
     private MacWebview() {}
@@ -75,8 +83,26 @@ public final class MacWebview {
      */
     public static native void runEventLoop();
 
-    /** Unparks {@link #runEventLoop()}. Safe to call when it is not parked. */
+    /** Unparks {@link #runEventLoop()}. Safe to call from any thread. */
     public static native void stopEventLoop();
+
+    /**
+     * End the process immediately.
+     *
+     * <p>Call only once postcard's own teardown has finished: nothing after this runs, not
+     * even JVM shutdown hooks. It exists because neither of the polite options works here.
+     * Waiting for the AppKit event loop to return does not, once AWT is up for the tray, and
+     * unwinding through {@code exit()} with a live NSApplication is what hung for seconds.
+     */
+    public static native void terminateNow();
+
+    /**
+     * Take over the application delegate, so Cmd-Q and Dock clicks reach postcard.
+     *
+     * <p>Must be called after AWT has initialised: setting up the tray installs AWT's own
+     * delegate, which would otherwise replace this one.
+     */
+    public static native void installAppDelegate();
 
     /** Destroys the window. Safe with handle 0 (no-op). */
     public static native void closeWindow(long handle);

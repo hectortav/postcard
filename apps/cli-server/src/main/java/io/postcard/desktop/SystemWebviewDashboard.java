@@ -119,7 +119,21 @@ public final class SystemWebviewDashboard implements Dashboard {
 
                 @Override public void onFirstLoad() {
                     // Once-only: didFinish can fire for subframes; tray installs once.
-                    if (trayInstalled.compareAndSet(false, true)) onFirstLoad.run();
+                    if (trayInstalled.compareAndSet(false, true)) {
+                        onFirstLoad.run();
+                        // After the tray, because initialising AWT installs a delegate of its
+                        // own and would overwrite ours.
+                        try {
+                            MacWebview.installAppDelegate();
+                        } catch (Exception | LinkageError e) {
+                            log.warn("postcard: could not install the app delegate ({})", e.getMessage());
+                        }
+                    }
+                }
+
+                @Override public void onQuitRequested() {
+                    log.info("postcard: quit requested");
+                    onQuitRequested.run();
                 }
             };
             // Synchronous by design: on thread 0 this runs the native build directly
