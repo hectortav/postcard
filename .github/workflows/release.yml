@@ -79,11 +79,64 @@ jobs:
       - name: Install JCEF natives
         run: cd apps/cli-server && ./gradlew installCefNatives
 
+      # Signing is opt-in. Without MACOS_CERTIFICATE the import is skipped, every signing
+      # argument is absent from the jpackage call, and the job still produces an installer --
+      # an unsigned one, which is what every release so far has shipped.
+      - name: Import the macOS signing certificate
+        if: matrix.os == 'macos-latest' && env.MACOS_CERTIFICATE != ''
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          # A throwaway keychain, so nothing is left behind on the runner.
+          keychain="$RUNNER_TEMP/postcard-signing.keychain-db"
+          password=$(openssl rand -base64 24)
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 900 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          echo "$MACOS_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$MACOS_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/productbuild
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain"
+          security list-keychain -d user -s "$keychain" login.keychain-db
+          rm -f "$RUNNER_TEMP/cert.p12"
+
       # Pick the right jpackage task per OS. Each task is gated inside
       # build.gradle.kts so a wrong-OS run is a no-op with a clear log
       # line rather than a cryptic tool failure.
       - name: Build installer
+        env:
+          POSTCARD_MAC_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
         run: cd apps/cli-server && ./gradlew ${{ matrix.os == 'macos-latest' && 'jpackageDmg' || (matrix.os == 'windows-latest' && 'jpackageMsi' || 'jpackageDeb') }}
+
+      - name: Notarize and staple the macOS installer
+        if: matrix.os == 'macos-latest' && env.APPLE_ID != ''
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          dmg=$(ls apps/cli-server/build/dist/installer/*.dmg)
+          xcrun notarytool submit "$dmg" \
+            --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" --wait
+          xcrun stapler staple "$dmg"
+          # Fails the job rather than shipping something Gatekeeper will quarantine.
+          spctl -a -vv -t install "$dmg"
+
+      - name: Sign the Windows installer
+        if: matrix.os == 'windows-latest' && env.WINDOWS_CERTIFICATE != ''
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          $pfx = Join-Path $env:RUNNER_TEMP 'postcard.pfx'
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE))
+          $msi = Get-ChildItem apps/cli-server/build/dist/installer/*.msi | Select-Object -First 1
+          & signtool sign /f $pfx /p $env:WINDOWS_CERTIFICATE_PASSWORD `
+            /tr http://timestamp.digicert.com /td sha256 /fd sha256 $msi.FullName
+          & signtool verify /pa $msi.FullName
+          Remove-Item $pfx
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
