@@ -23,6 +23,11 @@ public final class PinRateLimiter {
 
     public static final int MAX_FAILS = 3;
     public static final Duration LOCKOUT = Duration.ofMinutes(15);
+    /**
+     * Upper bound on tracked addresses. The map is keyed by remote IP, so without a cap a
+     * long-running host on a busy network accumulates an entry per address that ever guessed.
+     */
+    static final int MAX_TRACKED_IPS = 10_000;
 
     private final ConcurrentMap<String, Attempt> state = new ConcurrentHashMap<>();
     private final Clock clock;
@@ -72,6 +77,7 @@ public final class PinRateLimiter {
      */
     public Result recordFailure(String ip) {
         long now = clock.millis();
+        evictIfCrowded(now);
         Result[] out = new Result[1];
         state.compute(ip, (k, prev) -> {
             Attempt a = (prev == null) ? new Attempt(0, 0L) : prev;
@@ -80,6 +86,13 @@ public final class PinRateLimiter {
                 long ms = a.lockedUntilEpochMs - now;
                 out[0] = new Result(false, 0, ms);
                 return a;
+            }
+            // The lockout has run its course: serving the sentence clears the record. Without
+            // this the counter stayed at MAX_FAILS, so the first attempt after a 15-minute
+            // wait re-locked immediately -- the user never got their three tries back.
+            if (a.lockedUntilEpochMs != 0L && now >= a.lockedUntilEpochMs) {
+                a.fails = 0;
+                a.lockedUntilEpochMs = 0L;
             }
             a.fails = a.fails + 1;
             if (a.fails >= MAX_FAILS) {
@@ -98,6 +111,21 @@ public final class PinRateLimiter {
     /** Test-only: clear all state. Not part of the public HTTP contract. */
     public void reset() { state.clear(); }
 
+    /** Live tracked addresses. */
+    public int size() { return state.size(); }
+
+    /**
+     * Drop entries that no longer mean anything once the map gets large: first those whose
+     * lockout has expired, then -- if that was not enough -- everything unlocked. Locked
+     * addresses are kept, because forgetting them is exactly what an attacker wants.
+     */
+    private void evictIfCrowded(long now) {
+        if (state.size() < MAX_TRACKED_IPS) return;
+        state.values().removeIf(a -> a.lockedUntilEpochMs != 0L && now >= a.lockedUntilEpochMs);
+        if (state.size() < MAX_TRACKED_IPS) return;
+        state.values().removeIf(a -> a.lockedUntilEpochMs == 0L);
+    }
+
     /**
      * Read-only peek: how many more failures this IP can sustain before
      * being locked. Returns {@link #MAX_FAILS} for IPs with no recorded
@@ -108,6 +136,8 @@ public final class PinRateLimiter {
         Attempt a = state.get(ip);
         if (a == null) return MAX_FAILS;
         if (a.lockedUntilEpochMs != 0L && clock.millis() < a.lockedUntilEpochMs) return 0;
+        // An expired lockout is a clean slate; recordFailure will reset the counter.
+        if (a.lockedUntilEpochMs != 0L) return MAX_FAILS;
         if (a.fails >= MAX_FAILS) return 0;
         return Math.max(0, MAX_FAILS - a.fails);
     }
