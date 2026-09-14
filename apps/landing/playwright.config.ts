@@ -5,16 +5,16 @@ export default defineConfig({
   timeout: 30_000,
   expect: { timeout: 5_000 },
   fullyParallel: false,
-  retries: 0,
+  // One retry, so `trace: 'on-first-retry'` below can actually produce a trace: with
+  // zero retries a first retry never happens and the setting was inert.
+  retries: process.env.CI ? 1 : 0,
   workers: 1,
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: process.env.POSTCARD_LANDING_E2E_URL ?? 'http://localhost:4173',
     trace: 'on-first-retry',
   },
-  projects: [
-    { name: 'chromium', use: { browserName: 'chromium' } },
-  ],
+  projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],
   webServer: process.env.POSTCARD_LANDING_E2E_URL
     ? undefined
     : {

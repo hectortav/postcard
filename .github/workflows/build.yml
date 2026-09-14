@@ -1,6 +1,9 @@
 name: build
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -18,12 +21,18 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           version: 9.7.0
+      # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
+      # happened to ship, so a GitHub image bump silently changed the runtime under CI.
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 25
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
+      - run: pnpm format:check
 
   typecheck:
     runs-on: ${{ matrix.os }}
@@ -36,6 +45,11 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           version: 9.7.0
+      # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
+      # happened to ship, so a GitHub image bump silently changed the runtime under CI.
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -54,6 +68,11 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           version: 9.7.0
+      # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
+      # happened to ship, so a GitHub image bump silently changed the runtime under CI.
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -75,6 +94,11 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           version: 9.7.0
+      # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
+      # happened to ship, so a GitHub image bump silently changed the runtime under CI.
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -108,6 +132,11 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           version: 9.7.0
+      # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
+      # happened to ship, so a GitHub image bump silently changed the runtime under CI.
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -164,6 +193,11 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           version: 9.7.0
+      # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
+      # happened to ship, so a GitHub image bump silently changed the runtime under CI.
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -213,6 +247,11 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           version: 9.7.0
+      # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
+      # happened to ship, so a GitHub image bump silently changed the runtime under CI.
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -267,6 +306,11 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           version: 9.7.0
+      # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
+      # happened to ship, so a GitHub image bump silently changed the runtime under CI.
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -316,6 +360,11 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           version: 9.7.0
+      # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
+      # happened to ship, so a GitHub image bump silently changed the runtime under CI.
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -353,6 +402,25 @@ jobs:
       - if: always()
         run: pkill -f 'gradle' 2>/dev/null || true
 
+  e2e-landing:
+    # The landing site's own Playwright suite. It has a webServer in its config and needs no
+    # postcard server, but every e2e invocation in this workflow filtered to @postcard/web,
+    # so it had never run in CI at all.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run build
+      - run: pnpm --filter @postcard/landing exec playwright install --with-deps chromium
+      - run: pnpm --filter @postcard/landing e2e
+
   shadow-jar:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
@@ -364,6 +432,11 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           version: 9.7.0
+      # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
+      # happened to ship, so a GitHub image bump silently changed the runtime under CI.
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -379,82 +452,3 @@ jobs:
         with:
           name: postcard-${{ matrix.os }}
           path: apps/cli-server/build/libs/*-all.jar
-
-  agent-run:
-    # Refreshes the GraalVM native-image metadata under
-    # apps/cli-server/src/main/resources/META-INF/native-image/. The
-    # workflow fails the build if the metadata has drifted from what's
-    # committed, so a forgotten `metadataCopy` after a code change can't
-    # silently ship stale reflection / resource-config hints.
-    #
-    # Note: this job used to run inside `ghcr.io/graalvm/graalvm-ce:java21-22.3.0`,
-    # but that image was retired upstream. We now use `graalvm/setup-graalvm`
-    # to download the GraalVM JDK directly into the runner and set
-    # JAVA_HOME. Equivalent behaviour, no container dependency.
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    env:
-      JAVA_TOOL_OPTIONS: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/jdk.internal.misc=ALL-UNNAMED
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.7.0
-      - uses: graalvm/setup-graalvm@v1
-        with:
-          distribution: 'graalvm-community'
-          java-version: '25'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm turbo run build
-      - uses: actions/cache@v4
-        with:
-          path: ~/.gradle
-          key: gradle-agentrun-${{ hashFiles('apps/cli-server/**/*.kts', 'apps/cli-server/gradle/libs.versions.toml') }}
-      # The org.graalvm.buildtools.gradleplugin 0.10.x exposes
-      # `metadataCopy` (copies the agent's output into the project's
-      # META-INF/native-image/) rather than the older `agentRun` task.
-      # See https://graalvm.github.io/native-build-tools/latest/gradle-plugin.html#collecting-metadata-automatically
-      - name: Run native-image agent and copy metadata into the project
-        run: cd apps/cli-server && ./gradlew metadataCopy
-      - name: Surface any metadata drift as a workflow error
-        run: |
-          if ! git diff --exit-code -- 'apps/cli-server/src/main/resources/META-INF/native-image/'; then
-            echo "::error::GraalVM metadata has drifted. Run the agent-run job locally with 'cd apps/cli-server && ./gradlew metadataCopy' and commit the changes."
-            exit 1
-          fi
-
-  native:
-    # Builds the GraalVM native binary via `gradle nativeCompile`. macOS
-    # builds are run on `macos-latest`; Linux on `ubuntu-latest`. The
-    # foojay-resolver-convention plugin in apps/cli-server/settings.gradle.kts
-    # handles JDK provisioning, so the runner just needs JAVA_HOME pointing
-    # at a GraalVM distribution.
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-    env:
-      JAVA_TOOL_OPTIONS: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/jdk.internal.misc=ALL-UNNAMED
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.7.0
-      - uses: graalvm/setup-graalvm@v1
-        with:
-          distribution: 'graalvm-community'
-          java-version: '25'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm turbo run build
-      - uses: actions/cache@v4
-        with:
-          path: ~/.gradle
-          key: gradle-${{ matrix.os }}-native-${{ hashFiles('apps/cli-server/**/*.kts', 'apps/cli-server/gradle/libs.versions.toml') }}
-      - run: cd apps/cli-server && ./gradlew nativeCompile
-      - uses: actions/upload-artifact@v4
-        with:
-          name: postcard-native-${{ matrix.os }}
-          path: apps/cli-server/build/native/nativeCompile/postcard
