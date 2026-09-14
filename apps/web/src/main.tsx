@@ -1,5 +1,6 @@
 import { render } from 'preact';
 import { App } from './App';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { tokens } from './tokens.stylex';
 
 const root = document.getElementById('root');
@@ -19,4 +20,9 @@ if (import.meta.env.DEV) {
   void import('./dev/spotlight').then(({ initSpotlight }) => initSpotlight());
 }
 
-render(<App />, root);
+render(
+  <ErrorBoundary>
+    <App />
+  </ErrorBoundary>,
+  root,
+);

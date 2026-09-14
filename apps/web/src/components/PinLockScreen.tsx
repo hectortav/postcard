@@ -215,7 +215,9 @@ const styles = stylex.create({
   // invisible, which is how "glass" usually ends up as decoration.
   shell: {
     position: 'relative',
-    minHeight: '100vh',
+    // 100vh on iOS Safari counts the dynamic toolbar as visible, so the page overflows by
+    // exactly the toolbar's height. dvh tracks it; vh stays for engines without dvh.
+    minHeight: stylex.firstThatWorks('100dvh', '100vh'),
     width: '100%',
     display: 'flex',
     alignItems: 'center',

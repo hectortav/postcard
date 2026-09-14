@@ -1,0 +1,14 @@
+{
+  "name": "postcard",
+  "short_name": "postcard",
+  "description": "A private way to move a file between two devices on the same wifi.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#F4EEE2",
+  "theme_color": "#F4EEE2",
+  "icons": [
+    { "src": "apple-touch-icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
