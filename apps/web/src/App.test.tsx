@@ -71,3 +71,35 @@ describe('App', () => {
     });
   });
 });
+
+describe('the tab strip follows the ARIA tabs pattern', () => {
+  it('links each tab to its panel and moves with the arrow keys', async () => {
+    // All three tabs used to be in the tab order with no arrow handling and no aria-controls,
+    // so a screen reader announced tabs it could not associate with anything.
+    render(<App />);
+    const tabs = screen.getAllByRole('tab');
+    expect(tabs).toHaveLength(3);
+
+    const panel = screen.getByRole('tabpanel');
+    expect(tabs[0]!.getAttribute('aria-controls')).toBe(panel.getAttribute('id'));
+    expect(panel.getAttribute('aria-labelledby')).toBe(tabs[0]!.getAttribute('id'));
+
+    // Roving tabindex: exactly one tab is reachable with Tab.
+    expect(tabs.filter((t) => t.getAttribute('tabindex') === '0')).toHaveLength(1);
+
+    fireEvent.keyDown(tabs[0]!, { key: 'ArrowRight' });
+    await waitFor(() =>
+      expect(screen.getAllByRole('tab')[1]!.getAttribute('aria-selected')).toBe('true'),
+    );
+
+    fireEvent.keyDown(screen.getAllByRole('tab')[1]!, { key: 'End' });
+    await waitFor(() =>
+      expect(screen.getAllByRole('tab')[2]!.getAttribute('aria-selected')).toBe('true'),
+    );
+
+    fireEvent.keyDown(screen.getAllByRole('tab')[2]!, { key: 'Home' });
+    await waitFor(() =>
+      expect(screen.getAllByRole('tab')[0]!.getAttribute('aria-selected')).toBe('true'),
+    );
+  });
+});

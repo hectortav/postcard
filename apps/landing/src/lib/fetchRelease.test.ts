@@ -86,3 +86,48 @@ describe('fetchLatestRelease', () => {
     expect(r?.assets).toEqual([]);
   });
 });
+
+describe('release caching', () => {
+  const body = {
+    tag_name: 'v9.9.9',
+    html_url: 'https://x/rel',
+    assets: [{ name: 'postcard-9.9.9.dmg', browser_download_url: 'https://x/mac.dmg', size: 1 }],
+  };
+
+  it('asks GitHub once and serves the rest from the cache', async () => {
+    // 60 unauthenticated requests an hour, per address. One office behind one address is
+    // enough to exhaust that and make a real release render as "Coming soon".
+    let calls = 0;
+    const fetchImpl = (async () => {
+      calls++;
+      return { ok: true, status: 200, json: async () => body } as Response;
+    }) as unknown as typeof fetch;
+
+    const first = await fetchLatestRelease(fetchImpl, 'https://api/x');
+    const second = await fetchLatestRelease(fetchImpl, 'https://api/x');
+    expect(calls).toBe(1);
+    expect(second).toEqual(first);
+  });
+
+  it('caches the absence of a release too', async () => {
+    let calls = 0;
+    const fetchImpl = (async () => {
+      calls++;
+      return { ok: false, status: 404 } as Response;
+    }) as unknown as typeof fetch;
+    expect(await fetchLatestRelease(fetchImpl, 'https://api/x')).toBeNull();
+    expect(await fetchLatestRelease(fetchImpl, 'https://api/x')).toBeNull();
+    expect(calls).toBe(1);
+  });
+
+  it('does not cache a failure, so a blip is retried', async () => {
+    let calls = 0;
+    const fetchImpl = (async () => {
+      calls++;
+      return { ok: false, status: 503 } as Response;
+    }) as unknown as typeof fetch;
+    await expect(fetchLatestRelease(fetchImpl, 'https://api/x')).rejects.toThrow();
+    await expect(fetchLatestRelease(fetchImpl, 'https://api/x')).rejects.toThrow();
+    expect(calls).toBe(2);
+  });
+});
