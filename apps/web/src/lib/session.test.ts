@@ -14,9 +14,9 @@ function respond(body: unknown, ok = true, status = 200) {
 
 describe('fetchSession', () => {
   it('reads what the server decided about this client', async () => {
-    respond({ pinRequired: true, manageable: true, encrypted: true, pinLength: 6 });
+    respond({ pinRequired: true, manageable: true, encrypted: true, pinLength: 6, mode: 'hotspot' });
     expect(await fetchSession()).toEqual({
-      pinRequired: true, manageable: true, encrypted: true, pinLength: 6,
+      mode: 'hotspot', pinRequired: true, manageable: true, encrypted: true, pinLength: 6,
     });
   });
 
@@ -27,8 +27,9 @@ describe('fetchSession', () => {
   });
 
   it('coerces junk rather than trusting it', async () => {
-    respond({ pinRequired: 'yes', manageable: 1, encrypted: null, pinLength: -3 });
+    respond({ pinRequired: 'yes', manageable: 1, encrypted: null, pinLength: -3, mode: 'nonsense' });
     const s = await fetchSession();
+    expect(s.mode).toBe('lan');
     expect(s.pinRequired).toBe(false);
     expect(s.manageable).toBe(false);
     expect(s.encrypted).toBe(false);
