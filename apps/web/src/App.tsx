@@ -10,6 +10,9 @@ import { Stamp } from './components/Stamp';
 import { QRCode } from './components/QRCode';
 import { PinLockScreen, type VerifyResult } from './components/PinLockScreen';
 import type { FileEntry, PostcardMode } from './types';
+import { readFragment } from './lib/fragment';
+import { fetchSession, DEFAULT_SESSION, type Session } from './lib/session';
+import { effectiveKey } from './security/pin';
 
 const WS_URL = (): string => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
 
@@ -22,19 +25,6 @@ const TAB_LABEL: Record<Tab, string> = {
   clipboard: 'Clipboard',
   qr: 'QR',
 };
-
-// Parse `?pin=<digits>` from the URL fragment. Returns the PIN length if
-// the fragment signals that the server was started with `--pin`; null
-// otherwise. The fragment is never sent to the server, so reading it is
-// safe.
-function readPinLengthFromHash(): number | null {
-  if (typeof location === 'undefined') return null;
-  const hash = location.hash.startsWith('#') ? location.hash.slice(1) : location.hash;
-  if (!hash) return null;
-  const params = new URLSearchParams(hash);
-  if (params.has('pin')) return 4;
-  return null;
-}
 
 async function verifyPinOnServer(pin: string): Promise<VerifyResult> {
   try {
@@ -62,8 +52,17 @@ export function App() {
   const [clipboard, setClipboard] = useState<string>('');
   const [mode, setMode] = useState<PostcardMode>('lan');
   const [hotspot, setHotspot] = useState<{ ssid: string; password: string } | null>(null);
-  const pinLength = useMemo<number | null>(() => readPinLengthFromHash(), []);
-  const [pinUnlocked, setPinUnlocked] = useState<boolean>(() => readPinLengthFromHash() === null);
+  // The fragment is read once. It is never sent to the server, and the key it carries stays
+  // in memory: no storage, no globals, nothing that outlives the tab.
+  const fragment = useMemo(() => readFragment(), []);
+  const [session, setSession] = useState<Session>(() => ({
+    ...DEFAULT_SESSION,
+    // Optimistic first paint: a link carrying a PIN is going to need the lock screen, and the
+    // server's answer replaces this a moment later.
+    pinRequired: fragment.pin !== null,
+  }));
+  const [pinUnlocked, setPinUnlocked] = useState(false);
+  const [downloadKey, setDownloadKey] = useState<Uint8Array | null>(null);
   // The PIN settings rewrite location.hash (key/pin for QR sharing); track it so
   // the QR tab re-renders with the fresh URL. Hash assignment fires hashchange
   // natively, so no manual event is needed.
@@ -76,9 +75,40 @@ export function App() {
 
   const { events, send } = useWebSocket(WS_URL());
 
-  const handlePinVerified = useCallback((_pin: string) => {
+  // Verification and key derivation are one step from the user's point of view, so they are
+  // one step here: PBKDF2 at 200k iterations takes real time on a phone, and the lock
+  // screen's own busy state should cover it rather than leaving a dead moment afterwards.
+  const verify = useCallback(
+    async (pin: string): Promise<VerifyResult> => {
+      const result = await verifyPinOnServer(pin);
+      if (!result.ok) return result;
+      if (fragment.secret) setDownloadKey(await effectiveKey(fragment.secret, pin));
+      return result;
+    },
+    [fragment],
+  );
+
+  const handlePinVerified = useCallback(() => {
     setPinUnlocked(true);
   }, []);
+
+  // What this client is allowed to do, and whether its downloads arrive encrypted, are the
+  // server's calls. Nothing here inspects the user agent or the address: the owned desktop
+  // window and a phone run this same code and must not drift (see AGENTS.md).
+  useEffect(() => {
+    const ac = new AbortController();
+    fetchSession(ac.signal)
+      .then((s) => {
+        setSession(s);
+        // No PIN in play: the fragment's secret is the key as it stands.
+        if (!s.pinRequired && fragment.secret) setDownloadKey(fragment.secret);
+      })
+      .catch(() => {
+        // Older server, or the request failed. Fall back to what the link implies.
+        if (fragment.pin === null && fragment.secret) setDownloadKey(fragment.secret);
+      });
+    return () => ac.abort();
+  }, [fragment]);
 
   // One-shot initial hydration
   useEffect(() => {
@@ -112,10 +142,10 @@ export function App() {
 
   return (
     <div className={stylex(styles.shell)} data-mode={mode}>
-      {pinLength !== null && !pinUnlocked ? (
+      {session.pinRequired && !pinUnlocked ? (
         <PinLockScreen
-          pinLength={pinLength}
-          verify={verifyPinOnServer}
+          pinLength={session.pinLength}
+          verify={verify}
           onVerified={handlePinVerified}
         />
       ) : (
@@ -153,7 +183,7 @@ export function App() {
             {tab === 'files' && (
               <>
                 <DropZone />
-                <FileList files={files} />
+                <FileList files={files} encrypted={session.encrypted} downloadKey={downloadKey} />
                 <PinSettings />
               </>
             )}

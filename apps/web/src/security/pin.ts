@@ -21,8 +21,10 @@
  *    (`crypto.getRandomValues` is *not* restricted to secure contexts and is still used
  *    for IVs.)
  *
- * Keys are raw 32-byte `Uint8Array`s rather than `CryptoKey`s, which is what the
- * streaming-decrypt path in `lib/decrypt.ts` consumes anyway.
+ * Keys, secrets and salts are all raw `Uint8Array`s here. They used to be hex strings while
+ * the server emitted base64url and `lib/decrypt.ts` expected standard base64 -- three
+ * encodings for one value, none of which agreed. Bytes are what PBKDF2 and AES-GCM actually
+ * consume, so the conversion happens once, at the edge, where the URL fragment is parsed.
  */
 import { sha256 } from '@noble/hashes/sha2.js';
 import { pbkdf2Async } from '@noble/hashes/pbkdf2.js';
@@ -31,61 +33,47 @@ import { gcm } from '@noble/ciphers/aes.js';
 const PBKDF2_ITERATIONS = 200_000;
 const KEY_BYTES = 32;
 const IV_BYTES = 12;
-const HEX = '0123456789abcdef';
-
-function fromHex(s: string): Uint8Array {
-  const len = s.length;
-  if (len % 2 !== 0) throw new Error('hex string must have even length');
-  const out = new Uint8Array(len / 2);
-  for (let i = 0; i < len; i += 2) {
-    const hi = HEX.indexOf(s.charAt(i).toLowerCase());
-    const lo = HEX.indexOf(s.charAt(i + 1).toLowerCase());
-    if (hi < 0 || lo < 0) throw new Error('non-hex character at ' + i);
-    out[i / 2] = (hi << 4) | lo;
-  }
-  return out;
-}
-
-function toHex(bytes: Uint8Array): string {
-  let out = '';
-  for (let i = 0; i < bytes.length; i++) {
-    const b = bytes[i] ?? 0;
-    out += HEX.charAt(b >>> 4) + HEX.charAt(b & 0x0f);
-  }
-  return out;
-}
-
 /**
- * The deterministic salt for a secret: `SHA-256(secretBytes)` as lowercase hex.
- * Matches `PinSecurityEngine.saltFor`.
- */
-export async function saltFor(secretHex: string): Promise<string> {
-  return toHex(sha256(fromHex(secretHex)));
-}
-
-/**
- * Derive the AES-256-GCM key from `(secretHex, pin, saltHex)`.
+ * The deterministic salt for a secret: `SHA-256(secret)`.
  *
- * @param secretHex hex-encoded 32-byte secret from the URL fragment; reaches the
- *                  derivation only via `saltHex`, matching the Java side
- * @param pin       the PIN shown on the host's terminal -- the PBKDF2 password
- * @param saltHex   hex-encoded `SHA-256` of the secret (see {@link saltFor})
+ * Matches `PinSecurityEngine.saltFor`, which returns the same digest hex-encoded and then
+ * decodes it again before use -- the bytes are the contract, the hex was only a transport.
+ */
+export function saltFor(secret: Uint8Array): Uint8Array {
+  return sha256(secret);
+}
+
+/**
+ * Derive the AES-256-GCM key from `(secret, pin, salt)`.
+ *
+ * @param secret the 32-byte secret from the URL fragment; reaches the derivation only via
+ *               `salt`, matching the Java side
+ * @param pin    the PIN shown on the host's terminal -- the PBKDF2 password
+ * @param salt   `SHA-256` of the secret (see {@link saltFor})
  * @returns the raw 32-byte key
  */
 export async function deriveKey(
-  secretHex: string,
+  secret: Uint8Array,
   pin: string,
-  saltHex: string,
+  salt: Uint8Array,
 ): Promise<Uint8Array> {
-  if (!secretHex) throw new Error('secret must not be empty');
+  if (!secret || secret.length === 0) throw new Error('secret must not be empty');
   if (!pin) throw new Error('pin must not be empty');
-  // Parsed for validation parity with the Java side, which rejects a malformed secret
-  // before deriving. The bytes themselves enter the derivation through the salt.
-  fromHex(secretHex);
-  return pbkdf2Async(sha256, new TextEncoder().encode(pin), fromHex(saltHex), {
+  if (!salt || salt.length === 0) throw new Error('salt must not be empty');
+  return pbkdf2Async(sha256, new TextEncoder().encode(pin), salt, {
     c: PBKDF2_ITERATIONS,
     dkLen: KEY_BYTES,
   });
+}
+
+/**
+ * The key for a session: the raw secret when there is no PIN, and the PBKDF2 derivation of
+ * (PIN, SHA-256(secret)) when there is one. Mirrors what the server encrypts with, so the two
+ * sides agree without ever exchanging the derived key.
+ */
+export async function effectiveKey(secret: Uint8Array, pin: string | null): Promise<Uint8Array> {
+  if (!pin) return secret;
+  return deriveKey(secret, pin, saltFor(secret));
 }
 
 /** AES-GCM encrypt with a fresh 12-byte IV. Returns the IV and ciphertext. */
