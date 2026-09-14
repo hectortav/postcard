@@ -30,6 +30,16 @@ class DesktopIntegrationTest {
         assertDoesNotThrow(() -> DesktopIntegration.installReopenHandler("http://127.0.0.1:1/", u -> {}));
     }
 
+    @Test void installQuitHandlerReportsWhetherThePlatformSupportsIt() {
+        // Same contract as the reopen handler: answer on every platform, never throw, so
+        // Main can call it unguarded during tray setup.
+        assertDoesNotThrow(() -> DesktopIntegration.installQuitHandler(() -> {}));
+    }
+
+    @Test void installQuitHandlerRejectsANullAction() {
+        assertThrows(NullPointerException.class, () -> DesktopIntegration.installQuitHandler(null));
+    }
+
     @Test void rejectsNullUrl() {
         assertThrows(NullPointerException.class,
             () -> DesktopIntegration.reopenAction(null, u -> {}));
