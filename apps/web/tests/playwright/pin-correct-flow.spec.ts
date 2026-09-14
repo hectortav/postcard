@@ -14,6 +14,10 @@ const E2E_URL = process.env.POSTCARD_E2E_URL ?? 'http://localhost:5173/';
 const PIN = '1234';
 
 test('correct PIN unlocks the dashboard and files round-trip', async ({ browser }) => {
+  // Unique per invocation: this spec runs under both browser projects against one server and
+  // can be retried, so a fixed name leaves several identical rows and the locator below
+  // matches all of them.
+  const name = `pin-hello-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.txt`;
   // Host: a fresh context. The server's gating and rate limiter are per-IP,
   // so each context gets its own quota.
   const hostCtx = await browser.newContext();
@@ -47,9 +51,9 @@ test('correct PIN unlocks the dashboard and files round-trip', async ({ browser 
 
   // Host drops a file; mobile should see it.
   await host.setInputFiles('input[type=file]', {
-    name: 'pin-hello.txt',
+    name,
     mimeType: 'text/plain',
     buffer: Buffer.from('hi'),
   });
-  await expect(mobile.getByRole('link', { name: 'pin-hello.txt' })).toBeVisible({ timeout: 5_000 });
+  await expect(mobile.getByRole('link', { name })).toBeVisible({ timeout: 10_000 });
 });

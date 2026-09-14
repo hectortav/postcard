@@ -60,14 +60,27 @@ class WebSocketHubTest {
         // The regression this pins: the per-session queue was filled by every broadcast and
         // drained by nothing, so frame 1,025 closed every client in the hub as a "slow
         // consumer" -- including ones that had acknowledged all 1,024 earlier frames.
+        //
+        // Sent in batches well under the queue depth, draining each before the next. The
+        // point is the cumulative count, not how much can be crammed in at once: a bounded
+        // queue is allowed to overflow when the producer genuinely outruns the consumer, and
+        // an unthrottled loop of 3,072 broadcasts can do exactly that on a loaded machine,
+        // which made this test fail on the slowest CI runner for the right reason.
         var hub = new WebSocketHub();
         var healthy = new FakeSession("healthy");
         hub.add(healthy);
-        int total = WebSocketHub.QUEUE_CAPACITY * 3;
-        for (int i = 0; i < total; i++) hub.broadcast("{\"i\":" + i + "}");
-        for (int i = 0; i < total; i++) {
-            assertEquals("{\"i\":" + i + "}", poll(healthy), "frame " + i + " should arrive in order");
+        int batch = WebSocketHub.QUEUE_CAPACITY / 4;
+        int batches = 12; // 3x the queue depth in total
+        int sent = 0;
+        for (int b = 0; b < batches; b++) {
+            for (int i = 0; i < batch; i++) hub.broadcast("{\"i\":" + (sent + i) + "}");
+            for (int i = 0; i < batch; i++) {
+                assertEquals("{\"i\":" + (sent + i) + "}", poll(healthy),
+                    "frame " + (sent + i) + " should arrive in order");
+            }
+            sent += batch;
         }
+        assertEquals(WebSocketHub.QUEUE_CAPACITY * 3, sent);
         assertFalse(healthy.closed, "a consumer that keeps up must never be dropped");
         assertEquals(1, hub.size());
         hub.close();
