@@ -81,7 +81,8 @@ describe('decryptToBlob', () => {
     const seen: number[] = [];
     await decryptToBlob(KEY, streamOf([encryptLikeServer(plaintext)]), FILE_ID, (n) => seen.push(n));
     expect(seen.at(-1)).toBe(plaintext.length);
-    expect(seen).toEqual([...seen].sort((a, b) => a - b));
+    // Progress only ever moves forward.
+    for (let i = 1; i < seen.length; i++) expect(seen[i]!).toBeGreaterThan(seen[i - 1]!);
   });
 
   it('handles an empty file', async () => {
