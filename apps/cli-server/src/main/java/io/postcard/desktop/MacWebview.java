@@ -62,6 +62,13 @@ public final class MacWebview {
     public static native long openWindow(String url, Host host);
 
     /**
+     * Brings an existing window back to the front, un-hiding and de-miniaturizing as needed.
+     *
+     * @return {@code true} if there was a window to raise
+     */
+    public static native boolean raiseWindow();
+
+    /**
      * Parks the calling thread in the AppKit event loop until {@link #stopEventLoop}.
      * Must be called on thread 0 (macOS launch flag guarantees this for
      * {@code main}).

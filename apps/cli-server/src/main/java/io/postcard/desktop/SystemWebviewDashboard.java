@@ -80,7 +80,18 @@ public final class SystemWebviewDashboard implements Dashboard {
 
     @Override
     public synchronized void open() {
-        if (handle != 0 || opening || closed) return;
+        if (closed || opening) return;
+        if (handle != 0) {
+            // Already built. A Dock click arrives here, and returning early is why pressing the
+            // Dock icon appeared to do nothing: the window was still there, just minimized or
+            // hidden behind other apps, and nothing asked AppKit to bring it back.
+            try {
+                if (!MacWebview.raiseWindow()) log.info("postcard: no window to raise");
+            } catch (Exception | LinkageError e) {
+                log.warn("postcard: could not raise the dashboard window ({})", e.getMessage());
+            }
+            return;
+        }
         opening = true;
         try {
             MacWebview.ensureLoaded(nativesDir);

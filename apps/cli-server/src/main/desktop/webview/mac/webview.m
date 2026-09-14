@@ -34,6 +34,11 @@ static jmethodID gOnDownloadComplete;
 static jmethodID gOnWindowClosed;
 static jmethodID gOnFirstLoad;
 static BOOL gFirstLoadFired = NO;
+// Set while AppKit is tearing the window down on its own (the red close button). Java's
+// shutdown path also calls closeWindow, and closing a window from inside its own
+// -windowShouldClose: is re-entrant: AppKit then finishes closing a window that has already
+// been closed and, with releasedWhenClosed, deallocated. That is the crash on quit.
+static BOOL gClosing = NO;
 
 jint JNI_OnLoad(JavaVM *vm, void *reserved) {
     (void)reserved;
@@ -98,7 +103,8 @@ static jstring nsStringToJstr(JNIEnv *env, NSString *s) {
     NSLog(@"postcard: webview finished loading (%@)", redactFragment([[wv URL] absoluteString]));
     if (!gFirstLoadFired) {
         gFirstLoadFired = YES;
-        JNIEnv *env = jniEnv();
+        JNIEnv *env = attachMain();
+        if (!env || !gHost) return;
         (*env)->CallVoidMethod(env, gHost, gOnFirstLoad);
         if ((*env)->ExceptionCheck(env)) (*env)->ExceptionClear(env);
     }
@@ -123,7 +129,8 @@ static jstring nsStringToJstr(JNIEnv *env, NSString *s) {
 - (void)webView:(WKWebView *)wv
         decidePolicyForNavigationAction:(WKNavigationAction *)action
         decisionHandler:(void (^)(WKNavigationActionPolicy))handler {
-    JNIEnv *env = jniEnv();
+    JNIEnv *env = attachMain();
+    if (!env || !gHost) { handler(WKNavigationActionPolicyAllow); return; }
     NSString *target = [[[action request] URL] absoluteString] ?: @"";
     jboolean external = (*env)->CallBooleanMethod(env, gHost,
         gShouldOpenExternally, nsStringToJstr(env, target));
@@ -153,7 +160,8 @@ static jstring nsStringToJstr(JNIEnv *env, NSString *s) {
         suggestedFilename:(NSString *)suggestedFilename
         completionHandler:(void (^)(NSURL * _Nullable))completionHandler {
     (void)response;
-    JNIEnv *env = jniEnv();
+    JNIEnv *env = attachMain();
+    if (!env || !gHost) { completionHandler(nil); return; }
     NSString *name = suggestedFilename ?: @"download";
     objc_setAssociatedObject(download, "postcardName", name,
         OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -169,7 +177,8 @@ static jstring nsStringToJstr(JNIEnv *env, NSString *s) {
 }
 
 - (void)downloadDidFinish:(WKDownload *)download {
-    JNIEnv *env = jniEnv();
+    JNIEnv *env = attachMain();
+    if (!env || !gHost) return;
     NSString *name = objc_getAssociatedObject(download, "postcardName") ?: @"download";
     (*env)->CallVoidMethod(env, gHost,
         gOnDownloadComplete, nsStringToJstr(env, name));
@@ -190,12 +199,25 @@ static jstring nsStringToJstr(JNIEnv *env, NSString *s) {
 @implementation PostcardWindowDelegate
 - (BOOL)windowShouldClose:(NSWindow *)sender {
     (void)sender;
-    // Closing quits postcard; teardown runs through QuitSequence on the Java side,
-    // which destroys this window via closeWindow.
-    JNIEnv *env = jniEnv();
-    (*env)->CallVoidMethod(env, gHost, gOnWindowClosed);
-    if ((*env)->ExceptionCheck(env)) (*env)->ExceptionClear(env);
+    // Closing quits postcard. AppKit is already closing this window, so mark it: the Java
+    // teardown that this call kicks off must not turn around and close it a second time.
+    gClosing = YES;
+    JNIEnv *env = attachMain();
+    if (env && gHost) {
+        (*env)->CallVoidMethod(env, gHost, gOnWindowClosed);
+        if ((*env)->ExceptionCheck(env)) (*env)->ExceptionClear(env);
+    }
     return YES;
+}
+
+- (void)windowWillClose:(NSNotification *)note {
+    (void)note;
+    // The window is going away for good; drop our references so nothing touches a dead
+    // object later. Releasing the JNI global ref here would race the teardown still running
+    // on another thread, so that stays in closeWindow.
+    gClosing = YES;
+    gWv = nil;
+    gWin = nil;
 }
 @end
 
@@ -254,7 +276,12 @@ JNIEXPORT jlong JNICALL Java_io_postcard_desktop_MacWebview_openWindow(
                        NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable)
             backing:NSBackingStoreBuffered defer:NO];
         [gWin setTitle:@"postcard"];
+        // Programmatically created NSWindows default to releasedWhenClosed = YES. Under ARC
+        // the static above is already a strong reference, so letting -close release it too
+        // is an over-release: the second one lands on freed memory.
+        [gWin setReleasedWhenClosed:NO];
         [gWin center];
+        gClosing = NO;
         PostcardWindowDelegate *wdel = [[PostcardWindowDelegate alloc] init];
         [gWin setDelegate:wdel];
         objc_setAssociatedObject(gWin, "postcardWindowDelegate", wdel,
@@ -313,10 +340,38 @@ JNIEXPORT void JNICALL Java_io_postcard_desktop_MacWebview_closeWindow(
         JNIEnv *env, jclass cls, jlong handle) {
     (void)env; (void)cls; (void)handle;
     runOnMain(^{
-        if (gWv) { [gWv removeFromSuperview]; gWv = nil; }
-        if (gWin) { [gWin close]; gWin = nil; }
-        if (gHost) { (*jniEnv())->DeleteGlobalRef(jniEnv(), gHost); gHost = NULL; }
+        // When the user clicked the red button, AppKit is mid-close and -close here would be
+        // re-entrant. Only tear the window down when something else asked us to (tray Quit,
+        // Ctrl-C), which is the case the flag leaves false.
+        if (!gClosing) {
+            if (gWv) { [gWv removeFromSuperview]; gWv = nil; }
+            if (gWin) { [gWin close]; gWin = nil; }
+        }
+        JNIEnv *e = attachMain();
+        if (e && gHost) { (*e)->DeleteGlobalRef(e, gHost); }
+        gHost = NULL;
     });
+}
+
+/*
+ * Class:     io_postcard_desktop_MacWebview
+ * Method:    raiseWindow
+ */
+JNIEXPORT jboolean JNICALL Java_io_postcard_desktop_MacWebview_raiseWindow(
+        JNIEnv *env, jclass cls) {
+    (void)env; (void)cls;
+    __block jboolean raised = JNI_FALSE;
+    runOnMain(^{
+        if (!gWin) return;
+        // A Dock click on a running app delivers a reopen event, not a new launch. The window
+        // may be minimized or the app hidden, so ordering it front is not enough on its own.
+        if ([NSApp isHidden]) [NSApp unhide:nil];
+        if ([gWin isMiniaturized]) [gWin deminiaturize:nil];
+        [gWin makeKeyAndOrderFront:nil];
+        [NSApp activateIgnoringOtherApps:YES];
+        raised = JNI_TRUE;
+    });
+    return raised;
 }
 
 /*

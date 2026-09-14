@@ -144,6 +144,13 @@ public final class Main {
             log.info("postcard: goodbye");
         };
 
+        // macOS renders the dashboard in the OS webview and parks thread 0 in the AppKit
+        // event loop. Decided here because it changes how the process is allowed to exit.
+        final boolean macWindow = isMacOs() && !opts.noBrowser;
+        // Set once the JVM has begun its own shutdown (Ctrl-C, SIGTERM), so thread 0 knows to
+        // let that finish instead of calling System.exit, which blocks forever mid-shutdown.
+        final var shuttingDown = new java.util.concurrent.atomic.AtomicBoolean();
+
         if (!opts.headless) {
             // Quitting is a two-party affair once Chromium is in the process: the JVM may not
             // exit until CEF says it is done, or its helper processes are orphaned and crash.
@@ -164,7 +171,22 @@ public final class Main {
                     timer.start();
                 },
                 QUIT_GRACE_MILLIS,
-                () -> System.exit(0));
+                macWindow
+                    // Leaving from a background thread while thread 0 is inside [NSApp run]
+                    // is what made quitting hang for seconds and, often enough, crash. Unpark
+                    // thread 0 instead and let main() finish the exit there.
+                    ? () -> {
+                        try { io.postcard.desktop.MacWebview.stopEventLoop(); } catch (Throwable _) {}
+                        var fallback = new Thread(() -> {
+                            try { Thread.sleep(2_000); } catch (InterruptedException _) { return; }
+                            // AppKit never came back. Cleanup has already run, so go.
+                            log.warn("postcard: the event loop did not stop; leaving now");
+                            Runtime.getRuntime().halt(0);
+                        }, "postcard-exit-fallback");
+                        fallback.setDaemon(true);
+                        fallback.start();
+                    }
+                    : () -> System.exit(0));
             final Runnable quit = quitSequence::request;
 
             // Closing the dashboard quits postcard, unconditionally. Deliberate, and it has
@@ -176,7 +198,6 @@ public final class Main {
             // and the whole JCEF bundle go away. macOS with --no-browser also stays on the
             // lazy JCEF dashboard: its window only ever opens from the tray, long after AWT
             // is up, which is exactly the order the system webview cannot tolerate.
-            boolean macWindow = isMacOs() && !opts.noBrowser;
             final String dashboardUrl = url;
             final java.net.Inet4Address bindAddr = bind;
             final Runnable installTray = () -> installTray(dashboardUrl, dashboardRef.get(), quit,
@@ -210,6 +231,7 @@ public final class Main {
             // (On the system-webview path this installs with the tray, on first load.)
             if (macWindow) {
                 final Runnable shutdownMac = () -> {
+                    shuttingDown.set(true);
                     cleanup.run();
                     try { io.postcard.desktop.MacWebview.stopEventLoop(); } catch (Throwable _) {}
                 };
@@ -217,6 +239,13 @@ public final class Main {
                 // Park thread 0 in the AppKit loop; the window, WebKit and (later) AWT
                 // all live off it. Ctrl-C unparks via the hook above.
                 io.postcard.desktop.MacWebview.runEventLoop();
+                // Unparked: either the user quit, or the JVM is already on its way out. In the
+                // second case System.exit would block here until the process died anyway, so
+                // just return and let the hook finish.
+                if (!shuttingDown.get()) {
+                    cleanup.run();
+                    System.exit(0);
+                }
             } else {
                 Runtime.getRuntime().addShutdownHook(new Thread(cleanup, "postcard-shutdown"));
             }
@@ -235,6 +264,7 @@ public final class Main {
                 java.util.function.Consumer<io.postcard.desktop.Notifier.Event>> notify,
             io.postcard.server.Server server, java.net.Inet4Address bind) {
         io.postcard.desktop.DesktopIntegration.installReopenHandler(url, _ -> dashboard.open());
+        io.postcard.desktop.DesktopIntegration.installQuitHandler(quit);
 
         // Install the menu-bar / system-tray icon. install() returns
         // Optional.empty() on platforms without a status-notifier host

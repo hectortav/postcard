@@ -61,6 +61,42 @@ public final class DesktopIntegration {
     }
 
     /**
+     * Route the platform Quit command (Cmd-Q, the Dock menu, "Quit postcard") into postcard's
+     * own shutdown.
+     *
+     * <p>Without this, AWT answers the Apple Event with its default handler, which calls
+     * {@code System.exit} on the AppKit thread. That skips the quit sequence entirely: the
+     * server never drains, the window is never torn down in order, and exiting from that
+     * thread while a full NSApplication is running is the shape that hangs. Cancelling the
+     * platform quit and running {@code quit} instead keeps one path out of the process.
+     *
+     * @return {@code true} if the handler was installed (macOS), {@code false} elsewhere.
+     *         Never throws.
+     */
+    public static boolean installQuitHandler(Runnable quit) {
+        Objects.requireNonNull(quit, "quit");
+        try {
+            if (!Desktop.isDesktopSupported()) return false;
+            var desktop = Desktop.getDesktop();
+            if (!desktop.isSupported(Desktop.Action.APP_QUIT_HANDLER)) return false;
+            desktop.setQuitHandler((e, response) -> {
+                log.info("postcard: quit requested by the desktop");
+                try {
+                    quit.run();
+                } finally {
+                    // postcard ends the process itself, once the teardown is done.
+                    response.cancelQuit();
+                }
+            });
+            log.info("postcard: quit handler installed");
+            return true;
+        } catch (Throwable t) {
+            log.info("postcard: quit handler unavailable ({})", t.getMessage());
+            return false;
+        }
+    }
+
+    /**
      * Subscribe to the platform's "application reopened" event.
      *
      * @return {@code true} if the handler was installed (macOS), {@code false} on platforms
