@@ -3,7 +3,6 @@ plugins {
     application
     jacoco
     id("com.gradleup.shadow") version "9.0.0"
-    id("org.graalvm.buildtools.native") version "0.11.0"
 }
 
 group = "io.postcard"
@@ -109,9 +108,22 @@ tasks.jacocoTestReport {
 
 tasks.jacocoTestCoverageVerification {
     violationRules {
+        // Raised from 0.50 as the route, command-line, file-store and websocket tests landed.
+        // Measured 0.73 line / 0.62 branch at the time of writing; the gate sits just under
+        // that so it ratchets rather than merely recording. The remaining gap is io.postcard
+        // (Main's startup wiring) and io.postcard.net (interface selection), both of which
+        // need a real machine to exercise honestly.
         rule {
             limit {
-                minimum = "0.50".toBigDecimal()
+                counter = "LINE"
+                minimum = "0.70".toBigDecimal()
+            }
+            element = "BUNDLE"
+        }
+        rule {
+            limit {
+                counter = "BRANCH"
+                minimum = "0.60".toBigDecimal()
             }
             element = "BUNDLE"
         }
@@ -133,9 +145,13 @@ tasks.jacocoTestCoverageVerification {
 // matching the plan's "CI fails if any threshold drops" rule.
 tasks.named("check") { dependsOn("jacocoTestCoverageVerification") }
 
-graalvmNative {
-    binaries { named("main") { imageName.set("postcard") } }
-}
+// The GraalVM native-image target is gone. It never produced a working binary: the classpath
+// web bundle is not embedded without an explicit resource declaration, so the dashboard would
+// have 404'd, and Jetty, Javalin, Jackson and logback all need reflection metadata that was
+// never generated. AWT (tray, notifications) and the JNI webview cannot work in a native
+// image at all, so even a fixed build would have been headless-only. CI compiled it on two
+// runners every push, uploaded a binary missing the shared libraries it needs to start, and
+// never ran it. The shipped artifacts are the jpackage installers and the shadow jar.
 
 // Build the web bundle before any artifact that needs the resources.
 // The Gradle project root is apps/cli-server; pnpm must run from the monorepo root
@@ -172,7 +188,6 @@ val generateVersionResource by tasks.registering {
 sourceSets.named("main") { resources.srcDir(generateVersionResource) }
 
 tasks.named("shadowJar") { dependsOn(buildWeb) }
-tasks.named("nativeCompile") { dependsOn(buildWeb) }
 
 // ---------------------------------------------------------------------------
 // Native installers via the JDK 25 toolchain's `jpackage`.
@@ -216,11 +231,39 @@ val iconFile: java.io.File = layout.projectDirectory
     .file("icons/postcard." + if (isMac) "icns" else if (isWindows) "ico" else "png")
     .asFile
 
-// jpackage rejects app-versions with a leading-zero first number (CFBundleVersion
-// requires the first component to be > 0). Bump a pre-1.0 project version to "1.0"
-// for the bundle; the user-facing version stays at 0.x in `version`.
-val appVersion: String =
-    if (version.toString().startsWith("0.")) "1.0" else version.toString()
+// jpackage rejects app-versions whose first number is zero (CFBundleVersion requires it to
+// be > 0), so a pre-1.0 project version needs a different number for the bundle. It used to
+// collapse to a flat "1.0", which meant every 0.x release produced a bundle claiming the same
+// version and installers with byte-identical names: two releases were indistinguishable on
+// disk, and macOS could not tell an upgrade from a reinstall. Shifting the components instead
+// keeps every release distinct -- 0.1.0 becomes 1.1.0, 0.2.3 becomes 1.2.3.
+val appVersion: String = run {
+    val v = version.toString()
+    if (!v.startsWith("0.")) v else "1." + v.removePrefix("0.")
+}
+
+/** The installer filename, which carries the real project version rather than appVersion. */
+fun installerName(extension: String): String =
+    if (extension == "deb") "postcard_${version}_amd64.deb" else "postcard-$version.$extension"
+
+/**
+ * Rename jpackage's output to carry the project version.
+ *
+ * jpackage names the file after `--app-version`, which is the shifted bundle number, so
+ * without this the artifact on the Releases page says 1.1.0 for a 0.1.0 build.
+ */
+fun renameInstaller(fromExtension: String) {
+    val dir = installerDir.get().asFile
+    val produced = (dir.listFiles() ?: emptyArray())
+        .filter { it.isFile && it.name.endsWith(".$fromExtension") }
+        .maxByOrNull { it.lastModified() } ?: return
+    val target = File(dir, installerName(fromExtension))
+    if (produced.name == target.name) return
+    target.delete()
+    if (!produced.renameTo(target)) {
+        logger.warn("postcard: could not rename ${'$'}{produced.name} to ${'$'}{target.name}")
+    }
+}
 
 // ---------------------------------------------------------------------------
 // System-webview native bridge (macOS leg).
@@ -374,11 +417,21 @@ tasks.register<Exec>("jpackageDmg") {
         jpackageBin.absolutePath,
         "--type", "dmg",
         "--name", "postcard",
+        // Pinned rather than derived from --vendor, so the bundle identity cannot drift.
+        "--mac-package-identifier", "io.postcard.app",
+        "--mac-package-name", "postcard",
         "--vendor", "io.postcard",
+        "--copyright", "Copyright (c) 2026 postcard contributors",
+        "--description", "Move a file between two devices on the same network.",
+        "--about-url", "https://github.com/hectortav/postcard",
+        // Ships the licence with the installer. The bundled JDK and Chromium both carry
+        // redistribution terms that nothing in the tree previously acknowledged.
+        "--license-file", rootProject.file("../../LICENSE").absolutePath,
         "--app-version", appVersion,
         "--app-image", appImageDir.get().asFile.absolutePath,
         "--dest", installerDir.get().asFile.absolutePath,
     )
+    doLast { renameInstaller("dmg") }
 }
 
 tasks.register<Exec>("jpackageMsi") {
@@ -391,13 +444,26 @@ tasks.register<Exec>("jpackageMsi") {
         jpackageBin.absolutePath,
         "--type", "msi",
         "--name", "postcard",
+        // A fixed upgrade code makes a new MSI replace the previous install rather than
+        // sitting beside it as a second copy.
+        "--win-upgrade-uuid", "6f4d2c1a-8b3e-4d7a-9c15-2e8f0a6b3d41",
+        "--win-menu",
+        "--win-shortcut",
+        "--win-dir-chooser",
         "--vendor", "io.postcard",
+        "--copyright", "Copyright (c) 2026 postcard contributors",
+        "--description", "Move a file between two devices on the same network.",
+        "--about-url", "https://github.com/hectortav/postcard",
+        // Ships the licence with the installer. The bundled JDK and Chromium both carry
+        // redistribution terms that nothing in the tree previously acknowledged.
+        "--license-file", rootProject.file("../../LICENSE").absolutePath,
         "--app-version", appVersion,
         "--app-image", appImageDir.get().asFile.absolutePath,
         "--dest", installerDir.get().asFile.absolutePath,
         "--win-menu",
         "--win-shortcut",
     )
+    doLast { renameInstaller("msi") }
 }
 
 tasks.register<Exec>("jpackageDeb") {
@@ -411,10 +477,17 @@ tasks.register<Exec>("jpackageDeb") {
         "--type", "deb",
         "--name", "postcard",
         "--vendor", "io.postcard",
+        "--copyright", "Copyright (c) 2026 postcard contributors",
+        "--description", "Move a file between two devices on the same network.",
+        "--about-url", "https://github.com/hectortav/postcard",
+        // Ships the licence with the installer. The bundled JDK and Chromium both carry
+        // redistribution terms that nothing in the tree previously acknowledged.
+        "--license-file", rootProject.file("../../LICENSE").absolutePath,
         "--app-version", appVersion,
         "--app-image", appImageDir.get().asFile.absolutePath,
         "--dest", installerDir.get().asFile.absolutePath,
         "--linux-package-name", "postcard",
         "--linux-deb-maintainer", "ektoras@index-zr0.com",
     )
+    doLast { renameInstaller("deb") }
 }
