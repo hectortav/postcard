@@ -411,6 +411,11 @@ tasks.register<Sync>("jpackageInput") {
     from(cefBundleDir) { into("jcef-bundle") }
     // System-webview bridge beside the jar, where WebviewNatives.locate() looks.
     if (isMac) from(webviewNativesDir) { into("webview-natives") }
+    // The licence and the attribution for the bundled runtime and Chromium travel inside the
+    // app rather than as an installer agreement: jpackage turns --license-file into a
+    // click-through panel on macOS, and gating an MIT tool behind one buys nothing.
+    from(rootProject.file("../../LICENSE"))
+    from(rootProject.file("../../THIRD-PARTY-NOTICES.md"))
 }
 
 tasks.register<Exec>("appImage") {
@@ -539,9 +544,6 @@ tasks.register<Exec>("jpackageDmg") {
         "--copyright", "Copyright (c) 2026 postcard contributors",
         "--description", "Move a file between two devices on the same network.",
         "--about-url", "https://github.com/hectortav/postcard",
-        // Ships the licence with the installer. The bundled JDK and Chromium both carry
-        // redistribution terms that nothing in the tree previously acknowledged.
-        "--license-file", rootProject.file("../../LICENSE").absolutePath,
         "--app-version", appVersion,
         "--app-image", appImageDir.get().asFile.absolutePath,
         "--dest", installerDir.get().asFile.absolutePath,
