@@ -23,19 +23,22 @@ public final class Server {
     private boolean tempDir;
     private String hotspotSsid;
     private String hotspotPassword;
-    // PIN-derived AES key. Set by /api/pin/verify when the receiver proves
-    // knowledge of the PIN. Until set, /api/files and /api/download refuse
-    // requests with 401 when --pin was supplied at startup.
-    private volatile byte[] derivedKey;
+    // Per-client sessions. A receiver that proves knowledge of the PIN gets its own
+    // token; the gate below checks the caller's token rather than a single global flag,
+    // so one device unlocking no longer unlocks the whole LAN.
+    private final io.postcard.security.SessionTokens sessions = new io.postcard.security.SessionTokens();
     // Pre-derived key the sender produced at startup (when --pin is set).
     // Used by the /api/pin/verify route to compare against the receiver's
     // attempt without ever storing the PIN server-side.
     private volatile byte[] expectedDerivedKey;
-    // True when the CLI was launched with --pin. Gates /api/files and
-    // /api/download/{id} until derivedKey is set.
+    // True when the CLI was launched with --pin (or the dashboard armed one at runtime).
+    // Gates every data route on a verified per-client session; see the filter in build().
     private volatile boolean pinRequired;
     // LAN address bound at startup; null until Main sets it. See setBindHost.
     private volatile String bindHost;
+    // Port bound at startup; 0 until Main sets it. Used with bindHost to build the one
+    // Origin the browser is allowed to send.
+    private volatile int bindPort;
 
     public Server(PostcardOptions opts) { this.opts = opts; }
 
@@ -90,9 +93,36 @@ public final class Server {
     public boolean pinRequired() { return pinRequired; }
     public void setPinRequired(boolean v) { this.pinRequired = v; }
 
-    /** Derived AES key the receiver proved control of. Null until /api/pin/verify succeeds. */
-    public byte[] derivedKey() { return derivedKey; }
-    public void setDerivedKey(byte[] k) { this.derivedKey = k; }
+    /** Per-client PIN sessions; see {@link io.postcard.security.SessionTokens}. */
+    public io.postcard.security.SessionTokens sessions() { return sessions; }
+
+    /** Name of the cookie carrying a verified session. */
+    public static final String SESSION_COOKIE = "postcard_session";
+
+    /**
+     * The key downloads are encrypted under. Deterministic: when a PIN is armed it is always
+     * the key derived from (secret, PIN), which the receiver's browser derives independently.
+     * This used to depend on whether some other client had verified first.
+     */
+    public KeyMaterial effectiveKey() {
+        if (keyMaterial == null) return null;
+        byte[] derived = expectedDerivedKey;
+        return (pinRequired && derived != null) ? new KeyMaterial(derived) : keyMaterial;
+    }
+
+    /**
+     * Whether this caller's download should be encrypted.
+     *
+     * <p>The host already holds the plaintext on disk and its own requests never leave the
+     * machine, so encrypting for the owner buys nothing while forcing the dashboard through a
+     * decryption path with a hard memory ceiling. {@code --encrypt-owner} opts out of the
+     * bypass for an operator who wants it uniform (and is what lets CI exercise the receiver
+     * path, where Playwright's source address is the bind address).
+     */
+    public boolean shouldEncryptFor(String ip) {
+        if (keyMaterial == null) return false;
+        return opts.encryptOwner || !isOwnerIp(ip);
+    }
 
     /** Atomically swap the AES key the download route uses. */
     public void replaceKeyMaterial(KeyMaterial km) { this.keyMaterial = km; }
@@ -105,6 +135,60 @@ public final class Server {
      * unset means nobody manages.
      */
     public void setBindHost(String bindHost) { this.bindHost = bindHost; }
+
+    /** Bound port, recorded after {@code app.start()} so the Origin check knows the full origin. */
+    public void setBindPort(int bindPort) { this.bindPort = bindPort; }
+
+    /** The single Origin a browser is allowed to present, or null before the bind is known. */
+    public String allowedOrigin() {
+        return (bindHost == null || bindPort == 0) ? null : "http://" + bindHost + ":" + bindPort;
+    }
+
+    /**
+     * Whether a request may perform a state-changing action or open a WebSocket.
+     *
+     * <p>postcard has no CORS configuration, which meant any website the host visited could
+     * POST to {@code /api/pin/configure} and turn the PIN off, or push files into the shared
+     * directory: both are CORS-simple requests that need no preflight and arrive with the
+     * host's own source address. An absent Origin is allowed so curl and other non-browser
+     * clients keep working; a browser always sends one on these requests.
+     */
+    public boolean originAllowed(String origin) {
+        String expected = allowedOrigin();
+        if (expected == null) return true; // pre-bind (tests construct routes without a bind)
+        return origin == null || origin.isEmpty() || origin.equals(expected);
+    }
+
+    /**
+     * Whether the {@code Host} header names this server.
+     *
+     * <p>Guards against DNS rebinding: an attacker's domain that resolves to postcard's LAN
+     * address would otherwise let their page read {@code /api/files} and download, because a
+     * plain GET carries no {@code Origin} for the check above to reject.
+     *
+     * <p>Deliberately not strict equality with the bind address. postcard is a LAN tool and
+     * people legitimately reach it by names it never printed -- {@code macbook.local},
+     * {@code localhost}, a loopback literal during development. Refusing those with a bare 403
+     * would cost more than the narrowed attack surface is worth, so the rule is: the port must
+     * match, and the host must be the bind address, a loopback literal, or an mDNS
+     * {@code .local} name.
+     */
+    public boolean hostAllowed(String host) {
+        if (bindPort == 0) return true; // pre-bind
+        if (host == null || host.isEmpty()) return true; // HTTP/1.0 client
+        String name = host;
+        int colon = host.lastIndexOf(':');
+        // Ignore the colon inside a bracketed IPv6 literal ("[::1]").
+        if (colon > host.lastIndexOf(']')) {
+            String portPart = host.substring(colon + 1);
+            if (!portPart.equals(String.valueOf(bindPort))) return false;
+            name = host.substring(0, colon);
+        }
+        name = name.replace("[", "").replace("]", "");
+        if (name.equalsIgnoreCase(bindHost)) return true;
+        if (name.equalsIgnoreCase("localhost") || name.equals("::1") || name.startsWith("127.")) return true;
+        return name.toLowerCase(java.util.Locale.ROOT).endsWith(".local");
+    }
 
     /** Owner check for PIN management; see {@link #setBindHost(String)}. */
     public boolean isOwnerIp(String ip) {
@@ -139,7 +223,7 @@ public final class Server {
         } catch (Exception e) {
             throw new IllegalStateException("pin key derivation failed", e);
         }
-        derivedKey = null;
+        sessions.revokeAll();
         pinRequired = true;
     }
 
@@ -151,7 +235,33 @@ public final class Server {
     public synchronized void disablePin() {
         pinRequired = false;
         expectedDerivedKey = null;
-        derivedKey = null;
+        sessions.revokeAll();
+    }
+
+    /**
+     * Where Jetty spools multipart bodies, and where the upload handler writes its own
+     * temporary copy. Inside the shared directory so the existing teardown reclaims it.
+     */
+    public java.nio.file.Path uploadSpoolDir() {
+        if (store == null) return java.nio.file.Path.of(System.getProperty("java.io.tmpdir"));
+        var spool = store.dir().resolve(".postcard-tmp");
+        try { java.nio.file.Files.createDirectories(spool); } catch (Exception e) {
+            return store.dir();
+        }
+        return spool;
+    }
+
+    /**
+     * Delete anything left in the spool directory by a previous run that did not exit cleanly.
+     * Called at startup, when nothing can be mid-upload.
+     */
+    public void sweepUploadSpool() {
+        if (store == null) return;
+        var spool = store.dir().resolve(".postcard-tmp");
+        if (!java.nio.file.Files.isDirectory(spool)) return;
+        try (var files = java.nio.file.Files.list(spool)) {
+            files.forEach(p -> { try { java.nio.file.Files.deleteIfExists(p); } catch (Exception _) {} });
+        } catch (Exception _) { }
     }
 
     /** Per-IP PIN rate limiter. */
@@ -164,6 +274,22 @@ public final class Server {
                 s.directory = "/public";
                 s.location = Location.CLASSPATH;
             });
+            // Upload limits, enforced by Jetty before a byte reaches the handler.
+            //
+            // The README called --max-upload "pre-disk enforcement" and it was not: Javalin's
+            // defaults are unlimited size with a 1-byte in-memory threshold, so the servlet
+            // container spooled the entire body to java.io.tmpdir and only then ran the
+            // handler's own check. The Content-Length pre-check was the only real guard and it
+            // is trivially skipped with Transfer-Encoding: chunked.
+            //
+            // The spool directory also moves under the shared directory, so a crash or a kill
+            // -9 cannot strand multi-gigabyte temp files in the system temp directory: the
+            // shutdown path already deletes this tree.
+            cfg.jetty.multipartConfig.cacheDirectory(uploadSpoolDir().toString());
+            if (opts.maxUploadMiB != null) {
+                cfg.jetty.multipartConfig.maxFileSize(opts.maxUploadMiB, io.javalin.config.SizeUnit.MB);
+                cfg.jetty.multipartConfig.maxTotalRequestSize(opts.maxUploadMiB, io.javalin.config.SizeUnit.MB);
+            }
             // WebSocket limits — see design §6.1 / Global Constraints.
             // The brief's `app.jetty.modifyJetty(b -> b.setHandler(new HandlerList(...)))` is broken
             // Kotlin-style code; in Javalin 6.3.0 (Jetty 11.0.23 transitive) the policy settings
@@ -177,19 +303,71 @@ public final class Server {
             });
         });
         // Global response headers
-        app.before(ctx -> { ctx.header("X-Postcard-Mode", mode); ctx.header("Cache-Control", "no-store"); });
+        app.before(ctx -> {
+            ctx.header("X-Postcard-Mode", mode);
+            ctx.header("Cache-Control", "no-store");
+            // The dashboard renders filenames and shared clipboard text that any device on the
+            // LAN can set. Preact escapes both, so these are defence in depth rather than a fix
+            // for a live hole -- but an uploaded .html served from this same origin would
+            // otherwise be one navigation away from scripting the dashboard.
+            ctx.header("X-Content-Type-Options", "nosniff");
+            ctx.header("X-Frame-Options", "DENY");
+            ctx.header("Referrer-Policy", "no-referrer");
+            ctx.header("Content-Security-Policy",
+                "default-src 'self'; connect-src 'self' ws: wss:; img-src 'self' data:; "
+                + "style-src 'self' 'unsafe-inline'; script-src 'self'; object-src 'none'; "
+                + "base-uri 'none'; form-action 'none'; frame-ancestors 'none'");
+        });
         app.after(ctx -> { if (ctx.path().startsWith("/api/")) ctx.header("Cache-Control", "no-store"); });
         // In-flight tracking for graceful shutdown
         app.before(ctx -> Shutdown.enter());
         app.after(ctx -> Shutdown.leave());
 
-        app.get("/api/files", ctx -> {
-            if (pinRequired && derivedKey == null) {
-                ctx.status(401).json(java.util.Map.of("error", "pin_required"));
-                return;
+        // Same-origin enforcement for anything that changes state. See originAllowed.
+        app.before(ctx -> {
+            String method = ctx.method().name();
+            boolean stateChanging = method.equals("POST") || method.equals("PUT")
+                || method.equals("DELETE") || method.equals("PATCH");
+            if (!stateChanging) return;
+            if (!originAllowed(ctx.header("Origin"))) {
+                ctx.status(403).json(java.util.Map.of("error", "bad_origin"));
+                ctx.skipRemainingHandlers();
             }
-            ctx.json(store.list());
         });
+
+        // Host check on every request, including GETs, which carry no Origin.
+        app.before(ctx -> {
+            if (!hostAllowed(ctx.header("Host"))) {
+                ctx.status(403).json(java.util.Map.of("error", "bad_host"));
+                ctx.skipRemainingHandlers();
+            }
+        });
+
+        // PIN gate. Every data route requires this caller's own verified session; the
+        // unlock surface (/api/pin/verify, status, config) and the static dashboard stay open,
+        // or a receiver could never reach the screen that asks for the PIN.
+        app.before(ctx -> {
+            if (!pinRequired) return;
+            String path = ctx.path();
+            boolean gated = path.equals("/api/files") || path.equals("/api/upload")
+                || path.equals("/api/clipboard") || path.startsWith("/api/download/");
+            if (!gated) return;
+            if (!sessions.isValid(ctx.cookie(SESSION_COOKIE))) {
+                ctx.status(401).json(java.util.Map.of("error", "pin_required"));
+                ctx.skipRemainingHandlers();
+            }
+        });
+
+        // What the dashboard needs to know about this session, decided here rather than
+        // sniffed in the browser: the native window and a phone run the same bundle and must
+        // never diverge on their own (see AGENTS.md).
+        app.get("/api/session", ctx -> ctx.json(java.util.Map.of(
+            "pinRequired", pinRequired,
+            "manageable", isOwnerIp(ctx.ip()),
+            "encrypted", shouldEncryptFor(ctx.ip()),
+            "pinLength", 4)));
+
+        app.get("/api/files", ctx -> ctx.json(store.list()));
         app.post("/api/upload", ctx -> {
             long limit = opts.maxUploadMiB == null ? Long.MAX_VALUE : opts.maxUploadMiB * 1024L * 1024L;
             long contentLength = ctx.req().getContentLengthLong();
@@ -197,7 +375,7 @@ public final class Server {
             var f = ctx.uploadedFile("file");
             if (f == null) { ctx.status(400).json(java.util.Map.of("error", "missing_file")); return; }
             if (f.filename() != null && f.filename().codePoints().anyMatch(cp -> cp < 0x20)) { ctx.status(400).json(java.util.Map.of("error", "invalid_filename")); return; }
-            var tmp = java.nio.file.Files.createTempFile("up-", ".bin");
+            var tmp = java.nio.file.Files.createTempFile(uploadSpoolDir(), "up-", ".bin");
             try {
                 long written = 0;
                 try (var in = f.content(); var out = java.nio.file.Files.newOutputStream(tmp)) {
@@ -214,30 +392,25 @@ public final class Server {
             } finally { java.nio.file.Files.deleteIfExists(tmp); }
         });
         app.get("/api/download/{id}", ctx -> {
-            if (pinRequired && derivedKey == null) {
-                ctx.status(401).json(java.util.Map.of("error", "pin_required"));
-                return;
-            }
             var id = ctx.pathParam("id");
             if (!id.matches("^[A-Za-z0-9_-]{8,64}$")) { ctx.status(400); return; }
             var entry = store.findById(id);
             if (entry == null) { ctx.status(404); return; }
             var p = store.resolve(id);
+            if (p == null || !java.nio.file.Files.isRegularFile(p)) { ctx.status(404); return; }
             long size = entry.size();
             String filename = entry.name().replace("\"", "");
             announce(ctx.ip(), () -> io.postcard.desktop.Notifier.downloaded(entry.name()));
             ctx.header("Content-Disposition", "attachment; filename=\"" + filename + "\"");
-            String probed = java.nio.file.Files.probeContentType(p);
-            ctx.header("Content-Type", probed != null ? probed : "application/octet-stream");
+            // Always octet-stream. Serving an uploaded .html or .svg under its probed type
+            // would make it a same-origin document on the dashboard's own origin.
+            ctx.header("Content-Type", "application/octet-stream");
             ctx.header("ETag", "\"" + entry.sha256() + "\"");
 
-            if (keyMaterial != null) {
-                // Encrypted mode: ignore Range, full ciphertext+tag. After
-                // the PIN is verified the derived key (which mixes the URL
-                // secret with the user's PIN) is used for encryption. The
-                // original keyMaterial is kept around so the verify route
-                // can keep re-deriving and re-checking the PIN.
-                KeyMaterial effective = derivedKey != null ? new KeyMaterial(derivedKey) : keyMaterial;
+            if (shouldEncryptFor(ctx.ip())) {
+                // Encrypted mode: no Range (each chunk carries its own nonce and tag, so a
+                // byte range is not independently decryptable), full ciphertext+tag.
+                KeyMaterial effective = effectiveKey();
                 long ctLen = ChunkCipher.chunkContentLength(size);
                 ctx.status(200);
                 ctx.res().setContentLengthLong(ctLen);
@@ -249,7 +422,7 @@ public final class Server {
             String rangeH = ctx.header("Range");
             String ifRange = ctx.header("If-Range");
             if (ifRange != null && !("\"" + entry.sha256() + "\"").equals(ifRange) && !entry.sha256().equals(ifRange)) {
-                rangeH = null; // stale ETag → full re-send
+                rangeH = null; // stale ETag -> full re-send
             }
             if (rangeH == null) {
                 ctx.status(200);
@@ -265,7 +438,20 @@ public final class Server {
             long len = r.end() - r.start() + 1;
             ctx.status(206).header("Content-Range", "bytes " + r.start() + "-" + r.end() + "/" + size);
             ctx.res().setContentLengthLong(len);
-            try (var in = java.nio.file.Files.newInputStream(p)) { in.skipNBytes(r.start()); ctx.result(in.readNBytes((int) len)); }
+            // Streamed, not buffered: this used to be readNBytes((int) len), which allocated the
+            // whole range on the heap and silently truncated any range at or above 2 GiB.
+            try (var in = java.nio.file.Files.newInputStream(p); var out = ctx.outputStream()) {
+                in.skipNBytes(r.start());
+                byte[] buf = new byte[64 * 1024];
+                long remaining = len;
+                while (remaining > 0) {
+                    int want = (int) Math.min(buf.length, remaining);
+                    int n = in.read(buf, 0, want);
+                    if (n < 0) break;
+                    out.write(buf, 0, n);
+                    remaining -= n;
+                }
+            }
         });
         app.get("/api/clipboard", ctx -> ctx.json(java.util.Map.of("text", getClipboard())));
 
@@ -283,6 +469,19 @@ public final class Server {
         // passing an anonymous PostcardSession can no longer evict a real one.
         app.ws("/ws", ws -> {
             ws.onConnect(ctx -> {
+                // Same-origin: a WebSocket upgrade is not subject to CORS at all, so without
+                // this any page the host visits could open /ws and stream the file list.
+                if (!originAllowed(ctx.header("Origin")) || !hostAllowed(ctx.header("Host"))) {
+                    ctx.closeSession(4403, "bad origin");
+                    return;
+                }
+                // The snapshot below carries every filename, size, hash and the shared
+                // clipboard text. /api/files was gated on the PIN and this was not, so the
+                // PIN protected nothing against anyone willing to open a WebSocket.
+                if (pinRequired && !sessions.isValid(ctx.cookie(SESSION_COOKIE))) {
+                    ctx.closeSession(4401, "pin required");
+                    return;
+                }
                 // Enforce --auth-token (design §6.7, plan §29, spec §2 #1).
                 if (opts.authToken != null) {
                     String qs = ctx.queryString();

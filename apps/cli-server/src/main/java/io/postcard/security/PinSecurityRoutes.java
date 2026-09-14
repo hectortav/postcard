@@ -124,17 +124,28 @@ public final class PinSecurityRoutes {
             return;
         }
 
-        // Success: re-derive the key from (secret, pin, salt) and store it
-        // on the Server so subsequent /api/files and /api/download calls
-        // can use it (mixed with the PIN) instead of the raw random secret.
-        // We deliberately do NOT replace keyMaterial here — the original
-        // secret is what /api/pin/verify compares against, so swapping it
-        // out would lock out any subsequent verify attempt (e.g. a second
-        // device joining the same session).
-        byte[] derived = PinSecurityEngine.deriveKey(server.secretBytes(), pin, PinSecurityEngine.saltFor(server.secretBytes())).getEncoded();
-        server.setDerivedKey(derived);
+        // Success: mint a session for *this* client. The server already knows the derived
+        // key (it computed it when the PIN was armed), so nothing about the key changes here
+        // -- what changes is that this caller, and only this caller, is now authorized.
+        // Previously a success stored the key globally and every device on the LAN was let in.
         limiter.recordSuccess(ip);
+        issueSession(ctx);
         ctx.status(200).json(Map.of());
+    }
+
+    /**
+     * Attach a freshly minted session to the response.
+     *
+     * <p>A cookie rather than a bearer token: the dashboard's plain {@code <a download>} links
+     * and the WebSocket upgrade cannot carry a custom header, and both need authorizing.
+     * {@code SameSite=Strict} together with the server's Origin filter is what keeps the
+     * cookie from turning into a CSRF vector.
+     */
+    private void issueSession(io.javalin.http.Context ctx) {
+        String token = server.sessions().issue();
+        ctx.header("Set-Cookie", Server.SESSION_COOKIE + "=" + token
+            + "; Path=/; HttpOnly; SameSite=Strict; Max-Age="
+            + (io.postcard.security.SessionTokens.DEFAULT_TTL_MILLIS / 1000));
     }
 
     void handleStatus(io.javalin.http.Context ctx) {
