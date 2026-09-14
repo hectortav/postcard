@@ -1,0 +1,23 @@
+# Line endings are LF in the working tree on every platform.
+#
+# Without this, Windows checks out CRLF and `prettier --check` fails on every file in the
+# repository: the format job on windows-latest reported "Code style issues found in 103 files",
+# which was all of them, and none of them had anything wrong.
+* text=auto eol=lf
+
+# Except where the platform genuinely wants CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+gradlew.bat text eol=crlf
+
+# Never touched.
+*.jar binary
+*.png binary
+*.ico binary
+*.icns binary
+*.woff binary
+*.woff2 binary
+*.dmg binary
+*.msi binary
+*.deb binary
+*.p12 binary
