@@ -76,7 +76,12 @@ jobs:
       - run: pnpm turbo run test
       - uses: actions/cache@v5
         with:
-          path: ~/.gradle
+          # The two directories worth keeping, rather than all of ~/.gradle. Caching the whole
+          # directory sweeps up daemon logs and lock files, and saving it on Windows fails
+          # outright ("tar.exe failed with exit code 2"), so those jobs cached nothing at all.
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
           key: gradle-${{ runner.os }}-${{ hashFiles('apps/cli-server/**/*.kts', 'apps/cli-server/gradle/libs.versions.toml') }}
       - run: cd apps/cli-server && ./gradlew test
 
@@ -423,7 +428,12 @@ jobs:
       - run: pnpm turbo run build
       - uses: actions/cache@v5
         with:
-          path: ~/.gradle
+          # The two directories worth keeping, rather than all of ~/.gradle. Caching the whole
+          # directory sweeps up daemon logs and lock files, and saving it on Windows fails
+          # outright ("tar.exe failed with exit code 2"), so those jobs cached nothing at all.
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
           key: gradle-${{ runner.os }}-${{ hashFiles('apps/cli-server/**/*.kts', 'apps/cli-server/gradle/libs.versions.toml') }}
       - run: cd apps/cli-server && ./gradlew shadowJar
       - uses: actions/upload-artifact@v7
