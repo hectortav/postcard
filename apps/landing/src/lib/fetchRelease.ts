@@ -58,6 +58,42 @@ type GitHubRelease = {
   assets: { name: string; browser_download_url: string; size: number }[];
 };
 
+/** How long a fetched release stays good for. */
+const CACHE_TTL_MS = 30 * 60 * 1000;
+const CACHE_KEY = 'postcard:latest-release';
+
+type Cached = { at: number; release: Release | null };
+
+/**
+ * Remember the last answer for half an hour.
+ *
+ * The GitHub API allows 60 unauthenticated requests an hour per address, and this page asks
+ * on every load. A handful of people behind one office address is enough to exhaust that, and
+ * the page then shows "Coming soon" for a release that exists. Session storage is per tab and
+ * survives reloads, which is the shape of the problem.
+ */
+function readCache(): Cached | null {
+  try {
+    const raw = sessionStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Cached;
+    if (typeof parsed?.at !== 'number') return null;
+    if (Date.now() - parsed.at > CACHE_TTL_MS) return null;
+    return parsed;
+  } catch {
+    // Private windows and blocked site data both throw here; a miss is the right answer.
+    return null;
+  }
+}
+
+function writeCache(release: Release | null): void {
+  try {
+    sessionStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), release }));
+  } catch {
+    // Not being able to cache is not a reason to fail the page.
+  }
+}
+
 /**
  * Fetch and parse the latest release. Throws on any non-2xx (other than
  * 404, which yields `null` to distinguish "no release" from "the API is
@@ -67,8 +103,13 @@ export async function fetchLatestRelease(
   fetchImpl: typeof fetch = fetch,
   url: string = RELEASES_URL,
 ): Promise<Release | null> {
+  const cached = readCache();
+  if (cached) return cached.release;
   const res = await fetchImpl(url, { headers: GITHUB_API_HEADERS });
-  if (res.status === 404) return null;
+  if (res.status === 404) {
+    writeCache(null);
+    return null;
+  }
   if (!res.ok) throw new Error(`releases: ${res.status}`);
   const data = (await res.json()) as GitHubRelease;
   const assets: ReleaseAsset[] = [];
@@ -77,5 +118,7 @@ export async function fetchLatestRelease(
     if (!os) continue;
     assets.push({ os, name: a.name, url: a.browser_download_url, size: a.size });
   }
-  return { tag: data.tag_name, htmlUrl: data.html_url, assets };
+  const release = { tag: data.tag_name, htmlUrl: data.html_url, assets };
+  writeCache(release);
+  return release;
 }

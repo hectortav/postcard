@@ -11,6 +11,7 @@ export default defineConfig({
   ],
   test: {
     environment: 'happy-dom',
+    setupFiles: ['./src/test-setup.ts'],
     globals: false,
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     // Phase 13: coverage gates. Plan calls for 90% on the rest of
