@@ -46,6 +46,19 @@ PIN screen would have to call `showModal()` to be a real `<dialog>`; and `<progr
 styled to match the rest of the sheet. All three carry the correct role and keyboard handling.
 The rest of the accessibility rules are on and enforced.
 
+## Two dependencies are deliberately held back
+
+Dependabot will keep offering these. Both are migrations rather than bumps, and both need
+their own change with their own testing.
+
+- **Javalin 7** would move off Jetty 11, whose community support has ended, which is the
+  reason to want it. It also removes the routing API this server is written against: every
+  `app.get` / `app.post` / `app.before` / `app.ws` call moves, and so do the Jetty 11 handles
+  used to configure multipart limits and the WebSocket factory.
+- **StyleX 0.19** drops the default export and changes how styles are applied, so
+  `import stylex from` and every `stylex(styles.x)` call site across both front ends changes
+  shape, and the result needs looking at rather than just building.
+
 ## Commits
 
 One line, `type: summary`, from feat, fix, docs, style, refactor, test, chore. Keep
