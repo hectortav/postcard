@@ -25,8 +25,10 @@ class PinConfigureRoutesTest {
     private Server server;
     private Javalin app;
     private String base;
-    private final HttpClient http =
-        HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
+    private final HttpClient http = HttpClient.newBuilder()
+        .connectTimeout(Duration.ofSeconds(2))
+        .cookieHandler(new java.net.CookieManager())
+        .build();
 
     private void start(boolean encrypt, boolean pinArmed, String bindHost) throws Exception {
         var opts = new PostcardOptions();
@@ -37,6 +39,7 @@ class PinConfigureRoutesTest {
         if (bindHost != null) server.setBindHost(bindHost);
         app = server.build();
         app.start("127.0.0.1", 0);
+        if (bindHost != null) server.setBindPort(app.port());
         base = "http://127.0.0.1:" + app.port();
     }
 
@@ -131,10 +134,10 @@ class PinConfigureRoutesTest {
     void changingThePinRekeysTheSession() throws Exception {
         start(true, true, "127.0.0.1");
         assertEquals(200, postJson("/api/pin/verify", "{\"pin\":\"1234\"}").statusCode());
-        assertNotNull(server.derivedKey());
+        assertEquals(1, server.sessions().size());
         var r = postJson("/api/pin/configure", "{\"pin\":\"5678\"}");
         assertEquals(200, r.statusCode());
-        assertNull(server.derivedKey(), "verified keys must not survive a re-key");
+        assertEquals(0, server.sessions().size(), "verified sessions must not survive a re-key");
         assertEquals(401, get("/api/files").statusCode());
         assertEquals(401, postJson("/api/pin/verify", "{\"pin\":\"1234\"}").statusCode());
         assertEquals(200, postJson("/api/pin/verify", "{\"pin\":\"5678\"}").statusCode());

@@ -45,8 +45,14 @@ class PinSecurityRoutesTest {
         server.setPinRequired(true);
         app = server.build();
         app.start("127.0.0.1", 0);
+        server.setBindHost("127.0.0.1");
+        server.setBindPort(app.port());
         base = "http://127.0.0.1:" + app.port();
-        http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
+        // A cookie jar makes this client behave like one browser: the session the verify
+        // route hands out is carried on later requests, and a *different* client is a
+        // different device with no session of its own.
+        http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2))
+            .cookieHandler(new java.net.CookieManager()).build();
     }
 
     @AfterEach
@@ -95,9 +101,59 @@ class PinSecurityRoutesTest {
         // After verify, /api/files is reachable (returns 200, body is the file list JSON)
         var files = get("/api/files");
         assertEquals(200, files.statusCode());
-        // And the derived key is in place on the server.
-        assertNotNull(server.derivedKey());
-        assertEquals(32, server.derivedKey().length);
+        // The unlock is carried by a session cookie, and exactly one session now exists.
+        assertTrue(r.headers().firstValue("Set-Cookie").orElse("").contains("postcard_session="),
+            "verify must hand the client a session");
+        assertEquals(1, server.sessions().size());
+    }
+
+    @Test
+    void oneClientVerifyingDoesNotUnlockAnother() throws Exception {
+        assertEquals(200, postJson("/api/pin/verify", "{\"pin\":\"1234\"}").statusCode());
+        assertEquals(200, get("/api/files").statusCode());
+
+        // A second device, with its own cookie jar and no PIN entered. This used to be 200:
+        // the first success set a single field on the server and opened the gate for the
+        // whole LAN, which also made the three-strike lockout pointless.
+        var other = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2))
+            .cookieHandler(new java.net.CookieManager()).build();
+        var r = other.send(HttpRequest.newBuilder(URI.create(base + "/api/files")).GET().build(),
+            HttpResponse.BodyHandlers.ofString());
+        assertEquals(401, r.statusCode());
+        assertTrue(r.body().contains("pin_required"));
+    }
+
+    @Test
+    void uploadAndClipboardAreGatedToo() throws Exception {
+        assertEquals(401, get("/api/clipboard").statusCode());
+        var upload = http.send(HttpRequest.newBuilder(URI.create(base + "/api/upload"))
+            .header("Content-Type", "text/plain")
+            .POST(HttpRequest.BodyPublishers.ofString("x")).build(),
+            HttpResponse.BodyHandlers.ofString());
+        assertEquals(401, upload.statusCode());
+    }
+
+    @Test
+    void stateChangingRequestsFromAnotherOriginAreRefused() throws Exception {
+        // A CORS-simple POST needs no preflight, so without this check any page the host
+        // visited could reconfigure or disable the PIN using the host's own address.
+        var r = http.send(HttpRequest.newBuilder(URI.create(base + "/api/pin/configure"))
+            .header("Content-Type", "text/plain")
+            .header("Origin", "http://evil.example")
+            .POST(HttpRequest.BodyPublishers.ofString("{}")).build(),
+            HttpResponse.BodyHandlers.ofString());
+        assertEquals(403, r.statusCode());
+        assertTrue(r.body().contains("bad_origin"));
+    }
+
+    @Test
+    void stateChangingRequestsFromTheDashboardOriginAreAllowed() throws Exception {
+        var r = http.send(HttpRequest.newBuilder(URI.create(base + "/api/pin/verify"))
+            .header("Content-Type", "application/json")
+            .header("Origin", base)
+            .POST(HttpRequest.BodyPublishers.ofString("{\"pin\":\"1234\"}")).build(),
+            HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, r.statusCode());
     }
 
     @Test

@@ -39,12 +39,12 @@ class ServerTest {
     @Test void enablePinCreatesSecretArmsGateAndDropsVerifiedKeys() {
         var s = plainServer();
         assertNull(s.secretBytes());
-        s.setDerivedKey(new byte[32]); // a previously verified receiver
+        s.sessions().issue(); // a previously verified receiver
         s.enablePin("1234");
         assertTrue(s.pinRequired());
         assertNotNull(s.secretBytes());
         assertNotNull(s.expectedDerivedKey());
-        assertNull(s.derivedKey(), "re-keying must force every receiver to re-verify");
+        assertEquals(0, s.sessions().size(), "re-keying must force every receiver to re-verify");
         assertTrue(PinSecurityEngine.verify(s.secretBytes(), "1234", s.expectedDerivedKey()));
         assertFalse(PinSecurityEngine.verify(s.secretBytes(), "9999", s.expectedDerivedKey()));
     }
@@ -66,7 +66,7 @@ class ServerTest {
         s.disablePin();
         assertFalse(s.pinRequired());
         assertNull(s.expectedDerivedKey());
-        assertNull(s.derivedKey());
+        assertEquals(0, s.sessions().size());
         assertArrayEquals(secret, s.secretBytes(), "disabling drops the gate, not the encryption");
     }
 
