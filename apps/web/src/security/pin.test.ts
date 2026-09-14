@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { deriveKey, saltFor, encrypt, decrypt } from './pin';
+import { deriveKey, saltFor, effectiveKey, encrypt, decrypt } from './pin';
 
 // Reference vectors produced by the Java side (io.postcard.security.PinSecurityEngine)
 // for secretBytes = 0x00,0x01,...,0x1f. Both ends must derive the same key from the
@@ -11,23 +11,29 @@ const KEY_FOR_1234 = '0bb7c33ae88bd1cf440a0634940923454f6962d92d0776dab9333fd183
 const KEY_FOR_9999 = '3b0579f282496c3d177025fb84b35dabf56a1a6b6de49c086e5a45bfb7fcb442';
 
 const hex = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
+// The vectors above are the Java side's own output and stay exactly as generated; only the
+// call sites changed, because these functions now take the bytes rather than their hex.
+const unhex = (s: string) =>
+  new Uint8Array((s.match(/../g) ?? []).map((pair) => parseInt(pair, 16)));
+const SECRET = unhex(SECRET_HEX);
+const SALT = unhex(SALT_HEX);
 
 // PBKDF2 at 200k iterations is deliberately slow; give these room.
 const SLOW = 30_000;
 
 describe('pin', () => {
   it('saltFor returns SHA-256(secretBytes) as hex, matching the Java side', async () => {
-    expect(await saltFor(SECRET_HEX)).toBe(SALT_HEX);
+    expect(hex(saltFor(SECRET))).toBe(SALT_HEX);
   });
 
   it('saltFor is deterministic for the same secret', async () => {
-    expect(await saltFor(SECRET_HEX)).toBe(await saltFor(SECRET_HEX));
+    expect(hex(saltFor(SECRET))).toBe(hex(saltFor(SECRET)));
   });
 
   it(
     'deriveKey matches the Java reference vector',
     async () => {
-      expect(hex(await deriveKey(SECRET_HEX, PIN, SALT_HEX))).toBe(KEY_FOR_1234);
+      expect(hex(await deriveKey(SECRET, PIN, SALT))).toBe(KEY_FOR_1234);
     },
     SLOW,
   );
@@ -38,8 +44,8 @@ describe('pin', () => {
       // The whole point of --pin: knowing the URL (and therefore the secret and
       // salt) must not be enough to derive the key. If the PIN does not feed the
       // derivation, it provides no cryptographic protection at all.
-      const a = await deriveKey(SECRET_HEX, '1234', SALT_HEX);
-      const b = await deriveKey(SECRET_HEX, '9999', SALT_HEX);
+      const a = await deriveKey(SECRET, '1234', SALT);
+      const b = await deriveKey(SECRET, '9999', SALT);
       expect(hex(a)).not.toBe(hex(b));
       expect(hex(b)).toBe(KEY_FOR_9999);
     },
@@ -49,8 +55,8 @@ describe('pin', () => {
   it(
     'deriveKey returns 256 bits and is deterministic',
     async () => {
-      const a = await deriveKey(SECRET_HEX, PIN, SALT_HEX);
-      const b = await deriveKey(SECRET_HEX, PIN, SALT_HEX);
+      const a = await deriveKey(SECRET, PIN, SALT);
+      const b = await deriveKey(SECRET, PIN, SALT);
       expect(a.length).toBe(32);
       expect(hex(a)).toBe(hex(b));
     },
@@ -69,8 +75,8 @@ describe('pin', () => {
         configurable: true,
       });
       try {
-        expect(await saltFor(SECRET_HEX)).toBe(SALT_HEX);
-        expect(hex(await deriveKey(SECRET_HEX, PIN, SALT_HEX))).toBe(KEY_FOR_1234);
+        expect(hex(saltFor(SECRET))).toBe(SALT_HEX);
+        expect(hex(await deriveKey(SECRET, PIN, SALT))).toBe(KEY_FOR_1234);
       } finally {
         Object.defineProperty(globalThis, 'crypto', { value: realCrypto, configurable: true });
       }
@@ -81,7 +87,7 @@ describe('pin', () => {
   it(
     'encrypt returns a 12-byte IV and decrypt round-trips the plaintext',
     async () => {
-      const key = await deriveKey(SECRET_HEX, PIN, SALT_HEX);
+      const key = await deriveKey(SECRET, PIN, SALT);
       const pt = new TextEncoder().encode('meet me by the letterbox');
       const { iv, ciphertext } = await encrypt(key, pt);
       expect(iv.length).toBe(12);
@@ -95,7 +101,7 @@ describe('pin', () => {
   it(
     'encrypt uses a fresh IV on every call',
     async () => {
-      const key = await deriveKey(SECRET_HEX, PIN, SALT_HEX);
+      const key = await deriveKey(SECRET, PIN, SALT);
       const pt = new TextEncoder().encode('same plaintext');
       const a = await encrypt(key, pt);
       const b = await encrypt(key, pt);
@@ -108,11 +114,31 @@ describe('pin', () => {
   it(
     'decrypt rejects a key derived from a different PIN',
     async () => {
-      const key = await deriveKey(SECRET_HEX, '1234', SALT_HEX);
-      const wrong = await deriveKey(SECRET_HEX, '9999', SALT_HEX);
+      const key = await deriveKey(SECRET, '1234', SALT);
+      const wrong = await deriveKey(SECRET, '9999', SALT);
       const { iv, ciphertext } = await encrypt(key, new TextEncoder().encode('secret'));
       await expect(decrypt(wrong, iv, ciphertext)).rejects.toThrow();
     },
     SLOW,
   );
+
+  it(
+    'effectiveKey derives through the PIN, and is the raw secret without one',
+    async () => {
+      // This is the whole point of --pin: the URL fragment alone is not enough. An attacker
+      // who reads the link over someone's shoulder has the secret and therefore the salt,
+      // and still has to brute-force the PIN against 200k iterations -- which the server's
+      // per-IP limiter then throttles to three tries.
+      expect(hex(await effectiveKey(SECRET, PIN))).toBe(KEY_FOR_1234);
+      expect(hex(await effectiveKey(SECRET, '9999'))).toBe(KEY_FOR_9999);
+      expect(hex(await effectiveKey(SECRET, null))).toBe(SECRET_HEX);
+    },
+    SLOW,
+  );
+
+  it('deriveKey rejects empty inputs', async () => {
+    await expect(deriveKey(new Uint8Array(), PIN, SALT)).rejects.toThrow();
+    await expect(deriveKey(SECRET, '', SALT)).rejects.toThrow();
+    await expect(deriveKey(SECRET, PIN, new Uint8Array())).rejects.toThrow();
+  });
 });
