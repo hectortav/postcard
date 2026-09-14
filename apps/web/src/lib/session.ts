@@ -1,3 +1,5 @@
+import type { PostcardMode } from '../types';
+
 /**
  * What the server says about this client's session.
  *
@@ -7,6 +9,8 @@
  * server recognises its address and says so. See AGENTS.md on native/web parity.
  */
 export type Session = {
+  /** Whether postcard is serving over the LAN or its own hotspot. */
+  mode: PostcardMode;
   /** A PIN is armed, so the dashboard is gated until this client verifies. */
   pinRequired: boolean;
   /** This client may change the PIN (the host, not a receiver). */
@@ -18,6 +22,7 @@ export type Session = {
 };
 
 export const DEFAULT_SESSION: Session = {
+  mode: 'lan',
   pinRequired: false,
   manageable: false,
   encrypted: false,
@@ -29,6 +34,7 @@ export async function fetchSession(signal?: AbortSignal): Promise<Session> {
   if (!res.ok) throw new Error(`session ${res.status}`);
   const body = (await res.json()) as Partial<Session>;
   return {
+    mode: body.mode === 'hotspot' ? 'hotspot' : 'lan',
     pinRequired: body.pinRequired === true,
     manageable: body.manageable === true,
     encrypted: body.encrypted === true,

@@ -365,6 +365,7 @@ public final class Server {
             "pinRequired", pinRequired,
             "manageable", isOwnerIp(ctx.ip()),
             "encrypted", shouldEncryptFor(ctx.ip()),
+            "mode", mode,
             "pinLength", 4)));
 
         app.get("/api/files", ctx -> ctx.json(store.list()));

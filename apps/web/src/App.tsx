@@ -9,9 +9,10 @@ import { Clipboard } from './components/Clipboard';
 import { Stamp } from './components/Stamp';
 import { QRCode } from './components/QRCode';
 import { PinLockScreen, type VerifyResult } from './components/PinLockScreen';
-import type { FileEntry, PostcardMode } from './types';
+import type { FileEntry, PostcardMode, ServerEvent } from './types';
 import { readFragment } from './lib/fragment';
 import { fetchSession, DEFAULT_SESSION, type Session } from './lib/session';
+import { listFiles } from './lib/api';
 import { effectiveKey } from './security/pin';
 
 const WS_URL = (): string => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
@@ -63,6 +64,8 @@ export function App() {
   }));
   const [pinUnlocked, setPinUnlocked] = useState(false);
   const [downloadKey, setDownloadKey] = useState<Uint8Array | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [clipboardWarning, setClipboardWarning] = useState(false);
   // The PIN settings rewrite location.hash (key/pin for QR sharing); track it so
   // the QR tab re-renders with the fresh URL. Hash assignment fires hashchange
   // natively, so no manual event is needed.
@@ -73,7 +76,28 @@ export function App() {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
-  const { events, send } = useWebSocket(WS_URL());
+  // Frames are applied as they arrive. Accumulating them into state grew without bound for
+  // the lifetime of the tab, and reading only the newest one from an effect lost any frame
+  // that shared a tick with another.
+  const handleEvent = useCallback((ev: ServerEvent) => {
+    if (ev.type === 'snapshot') {
+      setFiles(ev.files);
+      setClipboard(ev.clipboard);
+      if (ev.hotspot) setHotspot(ev.hotspot);
+    } else if (ev.type === 'file_added') {
+      setFiles((prev) =>
+        prev.some((f) => f.id === ev.id)
+          ? prev
+          : [...prev, { id: ev.id, name: ev.name, size: ev.size, mtime: ev.mtime, sha256: ev.sha256 }],
+      );
+    } else if (ev.type === 'file_removed') {
+      setFiles((prev) => prev.filter((f) => f.id !== ev.id));
+    } else if (ev.type === 'clipboard') {
+      setClipboard(ev.text);
+    }
+  }, []);
+
+  const { status, send } = useWebSocket(WS_URL(), handleEvent);
 
   // Verification and key derivation are one step from the user's point of view, so they are
   // one step here: PBKDF2 at 200k iterations takes real time on a phone, and the lock
@@ -100,6 +124,7 @@ export function App() {
     fetchSession(ac.signal)
       .then((s) => {
         setSession(s);
+        setMode(s.mode);
         // No PIN in play: the fragment's secret is the key as it stands.
         if (!s.pinRequired && fragment.secret) setDownloadKey(fragment.secret);
       })
@@ -110,35 +135,23 @@ export function App() {
     return () => ac.abort();
   }, [fragment]);
 
-  // One-shot initial hydration
+  // One-shot initial hydration. The socket's snapshot supersedes this almost immediately;
+  // this is what fills the page when the socket is slow to come up.
   useEffect(() => {
     const ac = new AbortController();
-    fetch('/api/files', { cache: 'no-store', signal: ac.signal })
-      .then(async (r) => {
-        const m = r.headers.get('X-Postcard-Mode');
-        if (m === 'hotspot' || m === 'lan') setMode(m);
-        if (r.ok) setFiles(await r.json());
+    listFiles(ac.signal)
+      .then((f) => {
+        setFiles(f);
+        setLoadFailed(false);
       })
-      .catch(() => {});
+      .catch((e) => {
+        if (ac.signal.aborted) return;
+        // A 401 is the PIN gate doing its job, not a failure worth reporting. Anything else
+        // used to be swallowed, so a dead server looked exactly like an empty share directory.
+        if (!(e instanceof Error && e.message.includes('401'))) setLoadFailed(true);
+      });
     return () => ac.abort();
   }, []);
-
-  // React to WS events (snapshot hydrates, deltas apply)
-  useEffect(() => {
-    const ev = events[events.length - 1];
-    if (!ev) return;
-    if (ev.type === 'snapshot') {
-      setFiles(ev.files);
-      setClipboard(ev.clipboard);
-      if (ev.hotspot) setHotspot(ev.hotspot);
-    } else if (ev.type === 'file_added') {
-      setFiles((prev) => (prev.some((f) => f.id === ev.id) ? prev : [...prev, { id: ev.id, name: ev.name, size: ev.size, mtime: ev.mtime, sha256: ev.sha256 }]));
-    } else if (ev.type === 'file_removed') {
-      setFiles((prev) => prev.filter((f) => f.id !== ev.id));
-    } else if (ev.type === 'clipboard') {
-      setClipboard(ev.text);
-    }
-  }, [events]);
 
   return (
     <div className={stylex(styles.shell)} data-mode={mode}>
@@ -150,6 +163,13 @@ export function App() {
         />
       ) : (
         <div className={stylex(styles.card)}>
+          {(status !== 'open' || loadFailed) && (
+            <p className={stylex(styles.connection)} role="status">
+              {status === 'connecting'
+                ? 'Reconnecting to postcard…'
+                : 'Not connected. New files will not appear until postcard is reachable again.'}
+            </p>
+          )}
           <header className={stylex(styles.masthead)}>
             <div className={stylex(styles.mastheadText)}>
               <h1 className={stylex(styles.title)}>postcard.</h1>
@@ -188,13 +208,22 @@ export function App() {
               </>
             )}
             {tab === 'clipboard' && (
-              <Clipboard
-                value={clipboard}
-                onChange={(t) => {
-                  setClipboard(t);
-                  send({ type: 'clipboard', text: t });
-                }}
-              />
+              <>
+                <Clipboard
+                  value={clipboard}
+                  onChange={(t) => {
+                    setClipboard(t);
+                    // The optimistic local update above makes the text look saved. If the
+                    // socket could not take it, nobody else will ever see it, so say so.
+                    setClipboardWarning(!send({ type: 'clipboard', text: t }));
+                  }}
+                />
+                {clipboardWarning && (
+                  <p className={stylex(styles.clipboardWarning)} role="alert">
+                    Not sent — postcard is not reachable. This text is only on this device.
+                  </p>
+                )}
+              </>
             )}
             {tab === 'qr' &&
               (hotspot ? (
@@ -218,10 +247,30 @@ export function App() {
 }
 
 const styles = stylex.create({
+  // Deliberately in the flow rather than floating: a server that has gone away is not a
+  // transient toast, it is the state of the page until it comes back.
+  connection: {
+    margin: '0 0 16px 0',
+    padding: '10px 12px',
+    borderRadius: '4px',
+    border: '1px solid #D8CDB7',
+    backgroundColor: '#F0E6D2',
+    fontSize: '13px',
+    lineHeight: 1.5,
+    color: '#4A443C',
+  },
+  clipboardWarning: {
+    margin: '6px 0 0 0',
+    fontSize: '12px',
+    lineHeight: 1.5,
+    color: '#A8332A',
+  },
   // The desk. Darker than the card so the sheet has something to rest on --
   // this separation is what the whole letterpress system depends on.
   shell: {
-    minHeight: '100vh',
+    // 100vh on iOS Safari counts the dynamic toolbar as visible, so the page overflows by
+    // exactly the toolbar's height. dvh tracks it; vh stays for engines without dvh.
+    minHeight: stylex.firstThatWorks('100dvh', '100vh'),
     backgroundColor: '#E3D9C4',
     color: '#1A1714',
     fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
@@ -247,7 +296,9 @@ const styles = stylex.create({
     boxShadow: '0 1px 1px rgba(90,74,52,0.10), 0 10px 28px -10px rgba(90,74,52,0.40)',
     overflow: 'hidden',
     '@media (max-width: 560px)': {
-      minHeight: '100vh',
+      // 100vh on iOS Safari counts the dynamic toolbar as visible, so the page overflows by
+    // exactly the toolbar's height. dvh tracks it; vh stays for engines without dvh.
+    minHeight: stylex.firstThatWorks('100dvh', '100vh'),
       borderRadius: '0',
       border: 'none',
       boxShadow: 'none',
@@ -327,6 +378,9 @@ const styles = stylex.create({
     '@media (max-width: 480px)': { padding: '20px 16px' },
   },
   footer: {
+    // index.html opts into viewport-fit=cover, which lets the page draw under the home
+    // indicator. Without this inset the footer sits beneath it on an iPhone.
+    paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))',
     display: 'flex',
     gap: '10px',
     alignItems: 'center',
