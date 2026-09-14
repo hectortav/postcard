@@ -36,7 +36,6 @@ public final class Main {
     }
 
     public static void main(String[] args) throws Exception {
-        var log = org.slf4j.LoggerFactory.getLogger(Main.class);
         var opts = new PostcardOptions();
         var cmd = new CommandLine(opts);
         // execute() returns ExitCode.OK when it has *handled* --help or --version, so the
@@ -45,6 +44,14 @@ public final class Main {
         if (cmd.execute(args) != 0) System.exit(EXIT_BAD_ARGS);
         var parsed = cmd.getParseResult();
         if (parsed.isUsageHelpRequested() || parsed.isVersionHelpRequested()) return;
+        // Before the first logger exists: logback reads this when it configures itself and
+        // will not revisit it.
+        String level = opts.resolvedLogLevel();
+        System.setProperty("postcard.log.level", level);
+        // Jetty and Javalin stay quiet unless debug output was actually asked for.
+        System.setProperty("postcard.log.level.libraries",
+            (level.equals("DEBUG") || level.equals("TRACE")) ? level : "WARN");
+        var log = org.slf4j.LoggerFactory.getLogger(Main.class);
         var server = new Server(opts);
         server.init();
         // A previous run killed mid-upload can leave spooled bodies behind; nothing is in

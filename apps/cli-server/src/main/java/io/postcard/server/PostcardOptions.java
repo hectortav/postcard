@@ -67,6 +67,14 @@ public class PostcardOptions implements Callable<Integer> {
         + "variable: a command-line value is visible to every user on the machine via `ps`.")
     public String authToken;
 
+    @CommandLine.Option(names = "--log-level", defaultValue = "${env:POSTCARD_LOG_LEVEL}",
+      description = "How much to print: error, warn, info (default), debug or trace.")
+    public String logLevel;
+
+    @CommandLine.Option(names = {"-q", "--quiet"},
+      description = "Only print warnings and errors. The URL, QR code and PIN still print.")
+    public boolean quiet;
+
     @CommandLine.Option(names = {"--pin"}, arity = "0..1", fallbackValue = "",
       defaultValue = "${env:POSTCARD_PIN}",
       description = "Require a 4-digit PIN to access files. Auto-generates one if no value is "
@@ -74,6 +82,23 @@ public class PostcardOptions implements Callable<Integer> {
         + "A PIN passed here is visible to every user on the machine via `ps`; set POSTCARD_PIN "
         + "instead, or pass --pin with no value and read the generated one from stdout.")
     public String pin;
+
+    /**
+     * The logback root level this command line asks for.
+     *
+     * <p>Applied by {@code Main} before anything logs, because logback reads the property when
+     * the first logger is created and ignores changes afterwards.
+     */
+    public String resolvedLogLevel() {
+        if (logLevel != null && !logLevel.isBlank()) {
+            String v = logLevel.trim().toUpperCase(java.util.Locale.ROOT);
+            return switch (v) {
+                case "ERROR", "WARN", "INFO", "DEBUG", "TRACE", "OFF" -> v;
+                default -> "INFO";
+            };
+        }
+        return quiet ? "WARN" : "INFO";
+    }
 
     @Override public Integer call() { return 0; }
 }

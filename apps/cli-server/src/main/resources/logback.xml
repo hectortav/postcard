@@ -1,6 +1,13 @@
 <configuration>
+  <!--
+    The level comes from the postcard.log.level property, which PostcardOptions sets from
+    the log-level and quiet flags before any logger is touched. Without it the only way to
+    change what postcard printed was to edit this file inside the jar.
+  -->
   <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
-    <encoder><pattern>%d{HH:mm:ss.SSS} %-5level %logger{30} - %msg%n</pattern></encoder>
+    <!-- The date is in the pattern because postcard is left running for days and a bare
+         HH:mm:ss makes a multi-day log ambiguous. -->
+    <encoder><pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level %logger{30} - %msg%n</pattern></encoder>
   </appender>
 
   <!--
@@ -16,7 +23,15 @@
     </filter>
   </appender>
 
-  <root level="INFO">
+  <!--
+    Jetty and Javalin announce themselves at INFO, which is eleven lines of build dates and
+    thread-pool sizes before postcard says anything. They are quiet by default and follow the
+    application level only when debug output is actually asked for.
+  -->
+  <logger name="org.eclipse.jetty" level="${postcard.log.level.libraries:-WARN}" />
+  <logger name="io.javalin" level="${postcard.log.level.libraries:-WARN}" />
+
+  <root level="${postcard.log.level:-INFO}">
     <appender-ref ref="STDOUT" />
     <appender-ref ref="SPOTLIGHT" />
   </root>
