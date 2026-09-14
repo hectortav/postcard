@@ -39,7 +39,12 @@ and the build still produces an unsigned installer.
 
 ## Info.plist
 
-`jpackage` generates a boilerplate `Info.plist` that includes an `NSMicrophoneUsageDescription`
-claiming postcard wants the microphone, and an `LSMinimumSystemVersion` of 10.11, which cannot
-be right for a JDK 25 app. `Info.plist` in this directory replaces both. jpackage
-picks it up through `--resource-dir`.
+`jpackage` generates a boilerplate `Info.plist` claiming postcard wants microphone access, with
+an `LSMinimumSystemVersion` of 10.11 that no JDK 25 app can honour, and the shifted bundle
+version rather than the real one. The `appImage` task corrects all of that afterwards with
+PlistBuddy.
+
+It is done that way rather than with a template passed through `--resource-dir`, which is the
+documented route: supplying a custom `Info.plist` makes the later `--app-image` dmg step fail
+with `app-image-requires-identifier`, because jpackage reads part of the app's identity back
+out of the plist it generated itself.

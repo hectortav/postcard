@@ -434,11 +434,34 @@ tasks.register<Exec>("appImage") {
         addAll(listOf("--main-class", "io.postcard.Main"))
         addAll(listOf("--dest", appImageDir.get().asFile.parentFile.absolutePath))
         if (isMac) {
+            // Has to be set here, not on the dmg task: when jpackage wraps a pre-built app
+            // image it reads the identity back out of the image rather than taking it from
+            // the command line, and refuses to build without one.
+            addAll(listOf("--mac-package-identifier", "io.postcard.app"))
             // Replaces jpackage's boilerplate Info.plist, which declares a microphone purpose
             // string postcard has no use for and a minimum OS version from 2015.
-            addAll(listOf("--resource-dir", rootProject.file("../../packaging/macos").absolutePath))
         }
         // Chromium needs a real AWT toolkit, and JCEF needs these opens on macOS from JDK 16 on.
+        // A stripped runtime. jpackage otherwise bundles the whole JDK, which is 123 MB of
+        // which postcard uses a fraction. The module list comes from `jdeps
+        // --print-module-deps` on the shadow jar, plus jdk.crypto.ec (TLS curves, loaded by
+        // service lookup rather than by a static reference, so jdeps cannot see it) and
+        // jdk.unsupported (Jetty and Kotlin both reach for sun.misc.Unsafe).
+        addAll(listOf("--add-modules", listOf(
+            "java.base",
+            "java.compiler",
+            "java.desktop",
+            "java.instrument",
+            "java.management",
+            "java.naming",
+            "java.net.http",
+            "java.security.jgss",
+            "java.sql",
+            "java.xml",
+            "jdk.crypto.ec",
+            "jdk.unsupported",
+        ).joinToString(",")))
+        addAll(listOf("--jlink-options", "--strip-debug --no-man-pages --no-header-files --compress=zip-6"))
         addAll(listOf("--java-options", "-Djava.awt.headless=false"))
         // JCEF calls System.loadLibrary. On JDK 25 that is a restricted method: it warns today
         // and is documented to be blocked in a future release unless native access is granted.
@@ -454,24 +477,39 @@ tasks.register<Exec>("appImage") {
 }
 
 /**
- * Write the values jpackage does not substitute into a custom Info.plist.
+ * Correct the Info.plist jpackage generates.
  *
- * With the stock template every release reported CFBundleVersion 1.0, so macOS could not tell
- * one install from another; with a custom template the keys come through as literal
- * DEPLOY_* placeholders instead. Setting them here is the only way to be sure the bundle
- * carries the version that was actually built.
+ * Done by editing the generated file rather than by supplying a template through
+ * `--resource-dir`: a custom Info.plist makes the later `--app-image` dmg step fail with
+ * `app-image-requires-identifier`, because jpackage reads part of the app's identity back out
+ * of the plist it wrote itself.
+ *
+ * Three things are wrong in the stock output. The version is whatever `--app-version` said,
+ * which is the shifted bundle number. `LSMinimumSystemVersion` is 10.11, which no JDK 25 app
+ * can honour. And it declares `NSMicrophoneUsageDescription` -- a purpose string for a
+ * permission postcard neither requests nor has any use for, which is a poor thing to ship in
+ * something whose whole claim is that it stays out of your business.
  */
 fun stampInfoPlist() {
     val plist = File(appImageDir.get().asFile, "Contents/Info.plist")
     if (!plist.exists()) return
-    fun set(key: String, value: String) {
-        providers.exec {
-            commandLine("/usr/libexec/PlistBuddy", "-c", "Set :$key $value", plist.absolutePath)
+    fun plistBuddy(command: String, ignoreFailure: Boolean = false) {
+        val result = providers.exec {
+            commandLine("/usr/libexec/PlistBuddy", "-c", command, plist.absolutePath)
+            isIgnoreExitValue = ignoreFailure
         }.result.get()
+        if (!ignoreFailure && result.exitValue != 0) {
+            throw GradleException("PlistBuddy failed: $command")
+        }
     }
-    set("CFBundleVersion", appVersion)
-    set("CFBundleShortVersionString", appVersion)
-    logger.lifecycle("postcard: stamped Info.plist with version $appVersion")
+    plistBuddy("Set :CFBundleVersion $appVersion")
+    plistBuddy("Set :CFBundleShortVersionString $appVersion")
+    plistBuddy("Set :LSMinimumSystemVersion 13.0", ignoreFailure = true)
+    plistBuddy("Add :LSMinimumSystemVersion string 13.0", ignoreFailure = true)
+    plistBuddy("Set :NSHumanReadableCopyright Copyright (c) 2026 postcard contributors")
+    plistBuddy("Delete :NSMicrophoneUsageDescription", ignoreFailure = true)
+    plistBuddy("Delete :NSCameraUsageDescription", ignoreFailure = true)
+    logger.lifecycle("postcard: corrected Info.plist (version $appVersion)")
 }
 
 tasks.named("appImage") {
@@ -494,9 +532,9 @@ tasks.register<Exec>("jpackageDmg") {
         *macSigningArgs().toTypedArray(),
         "--type", "dmg",
         "--name", "postcard",
-        // Pinned rather than derived from --vendor, so the bundle identity cannot drift.
-        "--mac-package-identifier", "io.postcard.app",
-        "--mac-package-name", "postcard",
+        // The bundle identifier is set when the app image is built, not here: jpackage reads
+        // it back out of the image, and passing it again alongside --app-image makes it
+        // refuse to build.
         "--vendor", "io.postcard",
         "--copyright", "Copyright (c) 2026 postcard contributors",
         "--description", "Move a file between two devices on the same network.",

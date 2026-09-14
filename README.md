@@ -46,8 +46,9 @@ WebKit view, which is part of the operating system and bundles nothing. On Windo
 and Linux it is an embedded Chromium (JCEF) shipped inside the app, so a first
 launch works with no network. Either way no external browser is launched. **Closing that
 window quits postcard**, including any transfer a phone still has in flight.
-Bundling Chromium is why the installers are large (the macOS app image is ~458 MB
-before compression).
+Bundling Chromium is why the Windows and Linux installers are large. macOS uses the
+system WebKit view for the window and only carries Chromium for the tray-opened
+fallback, so its app image is about 377 MB before compression.
 
 When a tray icon is available, postcard shows a desktop notification whenever
 _another_ device uploads a file or downloads one of yours. Your own uploads and
@@ -83,8 +84,11 @@ Notes:
 
 - The `.dmg` / `.msi` are **unsigned**; first-launch Gatekeeper / SmartScreen
   warnings are expected. Code signing is a v0.2+ concern.
-- The bundled JRE is the full JDK 25 runtime (~170 MB on disk before DMG
-  compression). A `jlink`-stripped runtime is a future enhancement.
+- The bundled runtime is `jlink`-stripped to the modules postcard actually uses,
+  which is about 53 MB on disk rather than the 123 MB of a whole JDK. If you add a
+  dependency that needs another module, add it to `--add-modules` in
+  `build.gradle.kts`; a missing one shows up as a `NoClassDefFoundError` at runtime,
+  not at build time.
 
 ## Release workflow
 
