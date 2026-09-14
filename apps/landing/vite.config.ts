@@ -8,6 +8,12 @@ import stylexPlugin from '@stylexjs/unplugin';
 // (`transformIndexHtml` is gated to `devMode === 'full'`). We do it
 // here, with a path that respects Vite's `base` (so GitHub Pages
 // hosting at `/postcard/` resolves the asset correctly).
+/**
+ * GitHub Pages serves this site under the repository name, so every asset URL carries that
+ * prefix. Single source of truth: the Vite `base` and the injected stylesheet both read it.
+ */
+const BASE = '/postcard/';
+
 const injectStylexCss = (): import('vite').Plugin => ({
   name: 'postcard:inject-stylex-css',
   apply: 'build',
@@ -15,22 +21,20 @@ const injectStylexCss = (): import('vite').Plugin => ({
   transformIndexHtml: {
     order: 'post',
     handler(html) {
-      // We hardcode the prefix here because the `base` config is
-      // `/postcard/` (see the top of this file); if the base ever
-      // changes, update this string in lockstep.
-      const link = '<link rel="stylesheet" href="/postcard/assets/stylex.css">';
-      if (html.includes('href="/postcard/assets/stylex.css"') || html.includes('href="/postcard/stylex.css"')) return html;
+      // Derived from BASE rather than written out a second time: these used to be two
+      // separate literals that had to be kept in step by hand, and the comment saying so
+      // named the wrong repository owner.
+      const href = `${BASE}assets/stylex.css`;
+      const link = `<link rel="stylesheet" href="${href}">`;
+      if (html.includes(`href="${href}"`) || html.includes(`href="${BASE}stylex.css"`)) return html;
       return html.replace('</head>', `  ${link}\n  </head>`);
     },
   },
 });
 
 export default defineConfig({
-  // `base: "/postcard/"` is the GitHub Pages URL prefix. The repo name on
-  // GitHub Pages is `postcard` (https://index-zr0.github.io/postcard/), so
-  // every asset URL needs to be prefixed with `/postcard/` to resolve.
-  // If the repo is ever renamed, this string must change in lockstep.
-  base: '/postcard/',
+  // The GitHub Pages URL prefix; see BASE.
+  base: BASE,
   plugins: [
     preact(),
     stylexPlugin.vite({ unstable_moduleResolution: { type: 'commonJS', rootDir: import.meta.dirname } }),

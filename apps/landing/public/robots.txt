@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://hectortav.github.io/postcard/sitemap.xml
