@@ -415,7 +415,7 @@ public final class Server {
                 ctx.status(200);
                 ctx.res().setContentLengthLong(ctLen);
                 try (var in = java.nio.file.Files.newInputStream(p); var out = ctx.outputStream()) {
-                    ChunkCipher.encryptStream(in, out, effective);
+                    ChunkCipher.encryptStream(in, out, effective, id);
                 }
                 return;
             }
