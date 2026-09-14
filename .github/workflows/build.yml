@@ -17,16 +17,16 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
         with:
           version: 9.7.0
       # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
       # happened to ship, so a GitHub image bump silently changed the runtime under CI.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 25
@@ -41,16 +41,16 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
         with:
           version: 9.7.0
       # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
       # happened to ship, so a GitHub image bump silently changed the runtime under CI.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 25
@@ -64,23 +64,23 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
         with:
           version: 9.7.0
       # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
       # happened to ship, so a GitHub image bump silently changed the runtime under CI.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 25
       - run: pnpm install --frozen-lockfile
       - run: pnpm turbo run build
       - run: pnpm turbo run test
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ~/.gradle
           key: gradle-${{ runner.os }}-${{ hashFiles('apps/cli-server/**/*.kts', 'apps/cli-server/gradle/libs.versions.toml') }}
@@ -90,16 +90,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
         with:
           version: 9.7.0
       # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
       # happened to ship, so a GitHub image bump silently changed the runtime under CI.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 25
@@ -113,7 +113,7 @@ jobs:
         run: pnpm --filter @postcard/landing test:coverage
       - name: Upload coverage HTML reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: postcard-coverage-html
           path: |
@@ -128,20 +128,20 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
         with:
           version: 9.7.0
       # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
       # happened to ship, so a GitHub image bump silently changed the runtime under CI.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 25
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: |
             ~/.gradle/caches
@@ -189,20 +189,20 @@ jobs:
       matrix:
         os: [ubuntu-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
         with:
           version: 9.7.0
       # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
       # happened to ship, so a GitHub image bump silently changed the runtime under CI.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 25
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: |
             ~/.gradle/caches
@@ -243,20 +243,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
         with:
           version: 9.7.0
       # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
       # happened to ship, so a GitHub image bump silently changed the runtime under CI.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 25
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: |
             ~/.gradle/caches
@@ -302,20 +302,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
         with:
           version: 9.7.0
       # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
       # happened to ship, so a GitHub image bump silently changed the runtime under CI.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 25
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: |
             ~/.gradle/caches
@@ -356,20 +356,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
         with:
           version: 9.7.0
       # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
       # happened to ship, so a GitHub image bump silently changed the runtime under CI.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 25
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: |
             ~/.gradle/caches
@@ -409,11 +409,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
         with:
           version: 9.7.0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
       - run: pnpm install --frozen-lockfile
@@ -428,27 +428,27 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
         with:
           version: 9.7.0
       # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
       # happened to ship, so a GitHub image bump silently changed the runtime under CI.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 25
       - run: pnpm install --frozen-lockfile
       - run: pnpm turbo run build
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ~/.gradle
           key: gradle-${{ runner.os }}-${{ hashFiles('apps/cli-server/**/*.kts', 'apps/cli-server/gradle/libs.versions.toml') }}
       - run: cd apps/cli-server && ./gradlew shadowJar
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: postcard-${{ matrix.os }}
           path: apps/cli-server/build/libs/*-all.jar
