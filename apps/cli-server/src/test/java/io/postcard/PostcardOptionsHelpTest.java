@@ -48,6 +48,34 @@ class PostcardOptionsHelpTest {
         assertTrue(opts.pin.isBlank(), "a bare --pin means 'generate one'");
     }
 
+    @Test void theLogLevelDefaultsToInfoAndFollowsQuiet() {
+        // Before this there was no way to change what postcard printed short of editing
+        // logback.xml inside the jar.
+        var opts = new PostcardOptions();
+        assertEquals("INFO", opts.resolvedLogLevel());
+        opts.quiet = true;
+        assertEquals("WARN", opts.resolvedLogLevel());
+    }
+
+    @Test void anExplicitLogLevelWinsOverQuiet() {
+        var opts = new PostcardOptions();
+        opts.quiet = true;
+        opts.logLevel = "debug";
+        assertEquals("DEBUG", opts.resolvedLogLevel());
+    }
+
+    @Test void logLevelsAreCaseInsensitiveAndNonsenseFallsBackToInfo() {
+        var opts = new PostcardOptions();
+        for (var given : new String[] {"error", "WARN", "Info", "debug", "trace", "off"}) {
+            opts.logLevel = given;
+            assertEquals(given.toUpperCase(java.util.Locale.ROOT), opts.resolvedLogLevel());
+        }
+        opts.logLevel = "loud";
+        assertEquals("INFO", opts.resolvedLogLevel(), "an unknown level must not silence postcard");
+        opts.logLevel = "   ";
+        assertEquals("INFO", opts.resolvedLogLevel());
+    }
+
     @Test void unknownOptionsAreRejected() {
         assertNotEquals(0, cmd().execute("--definitely-not-an-option"));
     }
