@@ -109,21 +109,25 @@ tasks.jacocoTestReport {
 tasks.jacocoTestCoverageVerification {
     violationRules {
         // Raised from 0.50 as the route, command-line, file-store and websocket tests landed.
-        // Measured 0.73 line / 0.62 branch at the time of writing; the gate sits just under
-        // that so it ratchets rather than merely recording. The remaining gap is io.postcard
-        // (Main's startup wiring) and io.postcard.net (interface selection), both of which
-        // need a real machine to exercise honestly.
+        //
+        // The number is what the headless CI runner measures, not what a developer machine
+        // reports. SystemTrayControllerTest skips itself when java.awt.SystemTray is
+        // unsupported, which is always true on the Linux runner that enforces this gate, so
+        // CI sees 0.69 where macOS sees 0.73. Setting the floor from the local figure made
+        // the gate fail on the only machine that runs it.
         rule {
             limit {
                 counter = "LINE"
-                minimum = "0.70".toBigDecimal()
+                minimum = "0.68".toBigDecimal()
             }
             element = "BUNDLE"
         }
+        // Same reasoning as the line gate above: headless CI measures lower than a developer
+        // machine because the tray tests skip themselves there.
         rule {
             limit {
                 counter = "BRANCH"
-                minimum = "0.60".toBigDecimal()
+                minimum = "0.57".toBigDecimal()
             }
             element = "BUNDLE"
         }

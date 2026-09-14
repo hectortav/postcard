@@ -203,8 +203,11 @@ Receivers decrypt in the browser. Two consequences worth knowing:
   through the tray icon rather than the Notification API.)
 - **Coverage gate**: `io.postcard.security.*` is held to 100% by the `coverage` CI
   job, apart from `PinSecurityEngine`'s two unreachable `NoSuchAlgorithmException`
-  catches. The Java bundle floor is 70% line and 60% branch, and the two web
-  bundles are gated at 88% lines / 75% branches and 85% respectively. Those are
+  catches. The Java bundle floor is 68% line and 57% branch, and the two web
+  bundles are gated at 88% lines / 75% branches and 85% respectively. The Java
+  figures are what the headless CI runner measures: the tray tests skip
+  themselves where `java.awt.SystemTray` is unavailable, so a local macOS run
+  reports several points higher. Those are
   the numbers CI enforces; they ratchet as coverage rises.
 
 - **Same-origin only**: state-changing requests and WebSocket upgrades must present
