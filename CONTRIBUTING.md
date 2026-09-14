@@ -37,6 +37,15 @@ scripts from a CDN. The web build fails if debug tooling reaches the production 
 (`apps/web/scripts/assert-no-sentry-in-bundle.mjs`), and that check is there because a
 regression once tripled the bundle size.
 
+## One lint rule is off on purpose
+
+`jsx-a11y/prefer-tag-over-role` is disabled in `.oxlintrc.json`. It fires in three places where
+the native element is the wrong answer: the drop zone cannot be a `<button>` because it
+contains an `<input type="file">` and interactive content inside a button is invalid HTML; the
+PIN screen would have to call `showModal()` to be a real `<dialog>`; and `<progress>` cannot be
+styled to match the rest of the sheet. All three carry the correct role and keyboard handling.
+The rest of the accessibility rules are on and enforced.
+
 ## Commits
 
 One line, `type: summary`, from feat, fix, docs, style, refactor, test, chore. Keep

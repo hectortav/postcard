@@ -120,6 +120,31 @@ export function App() {
     setPinUnlocked(true);
   }, []);
 
+  /** Arrow, Home and End move between tabs; Enter and Space still select. */
+  const onTabKeyDown = useCallback((event: KeyboardEvent, current: Tab) => {
+    const index = TABS.indexOf(current);
+    let next: Tab | undefined;
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      next = TABS[(index + 1) % TABS.length];
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      next = TABS[(index - 1 + TABS.length) % TABS.length];
+    } else if (event.key === 'Home') {
+      next = TABS[0];
+    } else if (event.key === 'End') {
+      next = TABS[TABS.length - 1];
+    } else if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      setTab(current);
+      return;
+    }
+    if (!next) return;
+    event.preventDefault();
+    setTab(next);
+    // Focus follows selection, which is what the pattern expects for tabs that switch on
+    // arrow keys alone.
+    document.getElementById(`tab-${next}`)?.focus();
+  }, []);
+
   // What this client is allowed to do, and whether its downloads arrive encrypted, are the
   // server's calls. Nothing here inspects the user agent or the address: the owned desktop
   // window and a phone run this same code and must not drift (see AGENTS.md).
@@ -168,11 +193,11 @@ export function App() {
       ) : (
         <div className={stylex(styles.card)}>
           {(status !== 'open' || loadFailed) && (
-            <p className={stylex(styles.connection)} role="status">
+            <output className={stylex(styles.connection)}>
               {status === 'connecting'
                 ? 'Reconnecting to postcard…'
                 : 'Not connected. New files will not appear until postcard is reachable again.'}
-            </p>
+            </output>
           )}
           <header className={stylex(styles.masthead)}>
             <div className={stylex(styles.mastheadText)}>
@@ -183,27 +208,35 @@ export function App() {
             </div>
             <Stamp size={44} hole="#F4EEE2" />
           </header>
-          <nav className={stylex(styles.tabs)} role="tablist">
+          {/* A div, not a nav: a tablist is a widget, and a landmark that is really a
+              widget announces itself twice and wrongly. */}
+          <div className={stylex(styles.tabs)} role="tablist" aria-label="Dashboard sections">
             {TABS.map((t) => (
               <div
                 key={t}
+                id={`tab-${t}`}
                 role="tab"
-                tabIndex={0}
+                // Roving tabindex: the tab strip is one stop, and the arrow keys move within
+                // it. All three used to be in the tab order with no arrow handling, which is
+                // not the tabs pattern a screen-reader user is told to expect.
+                tabIndex={tab === t ? 0 : -1}
                 aria-selected={tab === t}
+                aria-controls={`panel-${t}`}
                 className={stylex(styles.tab, tab === t && styles.tabActive)}
                 onClick={() => setTab(t)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    setTab(t);
-                  }
-                }}
+                onKeyDown={(e) => onTabKeyDown(e, t)}
               >
                 {TAB_LABEL[t]}
               </div>
             ))}
-          </nav>
-          <main className={stylex(styles.main)}>
+          </div>
+          <main
+            className={stylex(styles.main)}
+            id={`panel-${tab}`}
+            role="tabpanel"
+            aria-labelledby={`tab-${tab}`}
+            tabIndex={0}
+          >
             {tab === 'files' && (
               <>
                 <DropZone />
