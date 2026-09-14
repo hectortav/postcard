@@ -105,6 +105,21 @@ public final class EmbeddedDashboard implements Dashboard {
         builder.setInstallDir(nativesDir.toFile());
         builder.setSkipInstallation(true);                              // natives are bundled
         builder.getCefSettings().windowless_rendering_enabled = false;  // windowed: native drag-and-drop
+        // postcard's whole claim is that nothing leaves the network, but an embedded Chromium
+        // left at its defaults does not honour that on its own: it fetches component updates,
+        // field-trial configuration and safe-browsing lists in the background, none of which
+        // postcard asks for and none of which a LAN file transfer needs. The engine only ever
+        // loads one page, served from this process.
+        builder.addJcefArgs(
+            "--disable-background-networking",
+            "--disable-component-update",
+            "--disable-domain-reliability",
+            "--disable-sync",
+            "--disable-breakpad",
+            "--no-first-run",
+            "--no-default-browser-check",
+            "--metrics-recording-only",
+            "--disable-features=OptimizationHints,MediaRouter,Translate");
         builder.setAppHandler(new MavenCefAppHandlerAdapter() {         // never CefApp.addAppHandler
             /**
              * Cmd+Q, the Dock's Quit and a SIGTERM all arrive here rather than through the
