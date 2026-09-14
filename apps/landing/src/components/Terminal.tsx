@@ -20,11 +20,23 @@ export function Terminal() {
           <span className={stylex(styles.out)}>scan the qr to open on another device ▣</span>
         </code>
       </pre>
+      <p className={stylex(styles.note)}>
+        <code>postcard</code> is on your path once you install it below. Running from a clone
+        instead? <code>java -jar postcard-cli-server-0.1.0-all.jar --path ~/Desktop</code>.
+      </p>
     </section>
   );
 }
 
 const styles = stylex.create({
+  // The command above only exists once an installer has been run, which was not said
+  // anywhere: the only invocation the README documents is the jar.
+  note: {
+    margin: '10px 0 0 0',
+    fontSize: '13px',
+    lineHeight: 1.6,
+    color: '#4A443C',
+  },
   section: {
     padding: '44px 32px',
     borderBottom: '1px solid #D8CDB7',

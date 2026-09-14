@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import stylex from '@stylexjs/stylex';
 
 type Cell = string;
@@ -48,20 +48,30 @@ const ROWS: readonly Row[] = [
   },
 ];
 
-/**
- * Resolve the current viewport once at mount. We don't subscribe to
- * resize events — the section re-renders naturally when the page
- * resizes because Preact will reconcile the data-layout attribute
- * on the next render triggered by any state change. For a static
- * marketing section this is good enough.
- */
+/** Which shape the table takes at the current viewport width. */
 function getLayout(): 'stack' | 'grid' {
   if (typeof window === 'undefined') return 'grid';
   return window.innerWidth < 720 ? 'stack' : 'grid';
 }
 
 export function ComparisonTable() {
-  const [layout] = useState<'stack' | 'grid'>(getLayout);
+  // Read once at mount and then on resize. The previous version read it only at mount, with a
+  // comment claiming Preact would reconcile on "the next render triggered by any state
+  // change" -- but this component has no other state, so no such render ever happened and
+  // rotating a phone left the wrong layout on screen until a reload.
+  const [layout, setLayout] = useState<'stack' | 'grid'>(getLayout);
+
+  useEffect(() => {
+    const onResize = () => setLayout(getLayout());
+    window.addEventListener('resize', onResize);
+    // Covers an orientation change that settles after the resize event on some engines.
+    window.addEventListener('orientationchange', onResize);
+    onResize();
+    return () => {
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('orientationchange', onResize);
+    };
+  }, []);
 
   return (
     <section
