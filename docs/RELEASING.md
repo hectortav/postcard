@@ -37,6 +37,21 @@ The tag push runs `.github/workflows/release.yml`, which:
   the asset name did not classify: see `classifyAsset` in `apps/landing/src/lib/fetchRelease.ts`.
 - Download one installer and check the checksum against `SHASUMS256.txt`.
 
+## One-time repository settings
+
+These live in GitHub's settings, not in the repository, so they cannot be set from a commit.
+None of them is optional for a public release.
+
+- **Branch protection on `main`**, requiring `lint`, `typecheck`, `unit-test`, `coverage` and
+  the `e2e*` jobs. Without it the coverage gate is advisory: a failing run does not stop a
+  push. Settings → Branches → Add rule.
+- **Dependabot alerts and security updates**, which are currently off. `.github/dependabot.yml`
+  opens version-update pull requests, but alerts for known vulnerabilities are a separate
+  switch. Settings → Code security.
+- **Private vulnerability reporting**, which SECURITY.md points people at. Settings → Code
+  security → Private vulnerability reporting.
+- **Pages**, source set to GitHub Actions. Already enabled; the `pages` job fails without it.
+
 ## The signing secrets
 
 Everything below is optional. Without them the build still produces installers, unsigned, and
