@@ -2,7 +2,7 @@ plugins {
     java
     application
     jacoco
-    id("com.gradleup.shadow") version "9.0.0"
+    id("com.gradleup.shadow") version "9.6.1"
 }
 
 group = "io.postcard"

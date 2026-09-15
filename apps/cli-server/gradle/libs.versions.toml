@@ -21,7 +21,7 @@ mockito = "5.14.2"
 # shadow 8.1.1 (in the brief) was not published; the 8.x line starts at 8.3.0.
 # 8.3.5 was incompatible with the Gradle 9 application plugin (mainClassName removal),
 # so we use the first 9.x release, which is the line aligned with Gradle 9.
-shadow = "9.0.0"
+shadow = "9.6.1"
 # JCEF (embedded Chromium) via jcefmaven. The version tracks the Chromium major:
 # 146.0.10 is the current release. Natives are downloaded once at build time by the
 # `installCefNatives` task and bundled into the installer, so the app itself runs with
