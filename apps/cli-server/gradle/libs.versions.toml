@@ -15,7 +15,7 @@ logback = "1.5.20"
 # attacker-reachable input from any device on the network, which makes this the single
 # dependency most worth keeping current -- it was pinned to a 2022 build to match Javalin's
 # own transitive, and held there.
-jackson = "2.18.2"
+jackson = "2.22.2"
 junit = "5.11.4"
 mockito = "5.14.2"
 # shadow 8.1.1 (in the brief) was not published; the 8.x line starts at 8.3.0.
