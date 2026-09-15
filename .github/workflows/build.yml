@@ -113,7 +113,7 @@ jobs:
         run: pnpm --filter @postcard/landing test:coverage
       - name: Upload coverage HTML reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: postcard-coverage-html
           path: |
@@ -448,7 +448,7 @@ jobs:
           path: ~/.gradle
           key: gradle-${{ runner.os }}-${{ hashFiles('apps/cli-server/**/*.kts', 'apps/cli-server/gradle/libs.versions.toml') }}
       - run: cd apps/cli-server && ./gradlew shadowJar
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: postcard-${{ matrix.os }}
           path: apps/cli-server/build/libs/*-all.jar

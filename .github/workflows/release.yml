@@ -139,7 +139,7 @@ jobs:
           Remove-Item $pfx
 
       - name: Upload installer
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: postcard-installer-${{ matrix.os }}
           # .dmg / .msi / .deb live at the top of dist/installer; the
