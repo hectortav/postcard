@@ -5,7 +5,7 @@ javalin = "6.7.0"
 # transitive: jetty-servlet has no 12.x publication and jetty-core has no 11.x
 # publication (Jetty renamed/removed modules between 11.x and 12.x). Letting
 # Javalin's BOM govern is the minimal fix.
-picocli = "4.7.6"
+picocli = "4.7.7"
 zxing = "3.5.3"
 slf4j = "2.0.17"
 logback = "1.5.20"
