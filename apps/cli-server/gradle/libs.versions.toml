@@ -1,5 +1,5 @@
 [versions]
-javalin = "6.7.0"
+javalin = "7.2.3"
 # Javalin 6.3.0 owns the Jetty version via its jetty-bom import (Jetty 11.0.23).
 # We do not pin Jetty here because the brief's "12.0.10" pin conflicts with Javalin's
 # transitive: jetty-servlet has no 12.x publication and jetty-core has no 11.x
