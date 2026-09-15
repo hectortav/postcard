@@ -23,7 +23,7 @@ jobs:
           version: 9.7.0
       # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
       # happened to ship, so a GitHub image bump silently changed the runtime under CI.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
       - uses: actions/setup-java@v4
@@ -47,7 +47,7 @@ jobs:
           version: 9.7.0
       # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
       # happened to ship, so a GitHub image bump silently changed the runtime under CI.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
       - uses: actions/setup-java@v4
@@ -70,7 +70,7 @@ jobs:
           version: 9.7.0
       # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
       # happened to ship, so a GitHub image bump silently changed the runtime under CI.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
       - uses: actions/setup-java@v4
@@ -96,7 +96,7 @@ jobs:
           version: 9.7.0
       # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
       # happened to ship, so a GitHub image bump silently changed the runtime under CI.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
       - uses: actions/setup-java@v4
@@ -134,7 +134,7 @@ jobs:
           version: 9.7.0
       # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
       # happened to ship, so a GitHub image bump silently changed the runtime under CI.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
       - uses: actions/setup-java@v4
@@ -195,7 +195,7 @@ jobs:
           version: 9.7.0
       # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
       # happened to ship, so a GitHub image bump silently changed the runtime under CI.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
       - uses: actions/setup-java@v4
@@ -249,7 +249,7 @@ jobs:
           version: 9.7.0
       # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
       # happened to ship, so a GitHub image bump silently changed the runtime under CI.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
       - uses: actions/setup-java@v4
@@ -308,7 +308,7 @@ jobs:
           version: 9.7.0
       # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
       # happened to ship, so a GitHub image bump silently changed the runtime under CI.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
       - uses: actions/setup-java@v4
@@ -362,7 +362,7 @@ jobs:
           version: 9.7.0
       # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
       # happened to ship, so a GitHub image bump silently changed the runtime under CI.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
       - uses: actions/setup-java@v4
@@ -413,7 +413,7 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           version: 9.7.0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
       - run: pnpm install --frozen-lockfile
@@ -434,7 +434,7 @@ jobs:
           version: 9.7.0
       # Pinned from .nvmrc. Without this, jobs ran on whatever Node the runner image
       # happened to ship, so a GitHub image bump silently changed the runtime under CI.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
       - uses: actions/setup-java@v4
