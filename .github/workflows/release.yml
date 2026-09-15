@@ -233,7 +233,7 @@ jobs:
           node-version: 20
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @postcard/landing build
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v3
         with:
           path: apps/landing/dist
