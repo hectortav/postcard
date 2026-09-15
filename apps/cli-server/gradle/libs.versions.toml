@@ -7,7 +7,7 @@ javalin = "6.7.0"
 # Javalin's BOM govern is the minimal fix.
 picocli = "4.7.6"
 zxing = "3.5.3"
-slf4j = "2.0.17"
+slf4j = "2.0.19"
 logback = "1.5.20"
 # Jackson is optional in Javalin 6.3.0 (declared `<optional>true</optional>` in its POM), and
 # postcard uses it directly: the WebSocket clipboard handler parses `{type:"clipboard",...}`
