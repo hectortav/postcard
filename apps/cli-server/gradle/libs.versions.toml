@@ -11,7 +11,7 @@ javalin = "6.7.0"
 # publication (Jetty renamed/removed modules between 11.x and 12.x). Letting
 # Javalin's BOM govern is the minimal fix.
 picocli = "4.7.7"
-zxing = "3.5.3"
+zxing = "3.5.4"
 slf4j = "2.0.19"
 logback = "1.5.20"
 # Jackson is optional in Javalin 6.3.0 (declared `<optional>true</optional>` in its POM), and
