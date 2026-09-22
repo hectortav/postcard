@@ -22,7 +22,7 @@ logback = "1.5.20"
 # own transitive, and held there.
 jackson = "2.22.2"
 junit = "5.11.4"
-mockito = "5.14.2"
+mockito = "5.23.0"
 # shadow 8.1.1 (in the brief) was not published; the 8.x line starts at 8.3.0.
 # 8.3.5 was incompatible with the Gradle 9 application plugin (mainClassName removal),
 # so we use the first 9.x release, which is the line aligned with Gradle 9.
