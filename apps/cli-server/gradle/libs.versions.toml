@@ -13,7 +13,7 @@ javalin = "6.7.0"
 picocli = "4.7.7"
 zxing = "3.5.3"
 slf4j = "2.0.19"
-logback = "1.5.20"
+logback = "1.6.4"
 # Jackson is optional in Javalin 6.3.0 (declared `<optional>true</optional>` in its POM), and
 # postcard uses it directly: the WebSocket clipboard handler parses `{type:"clipboard",...}`
 # frames with ObjectMapper.readValue, and the PIN routes parse their request bodies. That is
